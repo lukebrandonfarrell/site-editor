@@ -142,8 +142,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Astro generated types
+# Astro generated types and Vercel build output
 .astro/
+.vercel/
 
 # Turbo Repo
 .turbo

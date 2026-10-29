@@ -1,13 +1,14 @@
 {
   "name": "@thereactnativerewind/site-editor",
-  "version": "0.1.0",
-  "description": "Plug-in visual editor so clients can edit marked copy on a live Next.js site without a pull request or rebuild.",
+  "version": "0.2.0",
+  "description": "Plug-in visual editor so clients can edit marked copy on a live Next.js or Astro site without a pull request or rebuild.",
   "license": "MIT",
   "author": "Luke Brandon Farrell",
   "type": "module",
   "sideEffects": false,
   "keywords": [
     "nextjs",
+    "astro",
     "visual-editor",
     "inline-editing",
     "cms",
@@ -30,6 +31,7 @@
   },
   "files": [
     "dist",
+    "astro",
     "migrations",
     "README.md"
   ],
@@ -51,17 +53,35 @@
       "types": "./dist/next/route.d.ts",
       "import": "./dist/next/route.js",
       "default": "./dist/next/route.js"
-    }
+    },
+    "./astro": {
+      "types": "./dist/astro/index.d.ts",
+      "import": "./dist/astro/index.js",
+      "default": "./dist/astro/index.js"
+    },
+    "./astro/editor": {
+      "types": "./dist/astro/editor-client.d.ts",
+      "import": "./dist/astro/editor-client.js",
+      "default": "./dist/astro/editor-client.js"
+    },
+    "./astro/middleware": {
+      "types": "./dist/astro/middleware.d.ts",
+      "import": "./dist/astro/middleware.js",
+      "default": "./dist/astro/middleware.js"
+    },
+    "./astro/Editable.astro": "./astro/Editable.astro"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts",
+    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts",
+    "prepare": "tsc -p tsconfig.json",
     "test:postgres": "tsx --test test/postgres.integration.test.ts",
     "migrate": "node dist/cli/migrate.js",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@vercel/functions": "^3.1.4",
     "pg": "^8.23.1",
     "resend": "^6.35.0",
     "server-only": "^0.0.1"
@@ -70,9 +90,16 @@
     "@vercel/blob": "^2.8.2"
   },
   "peerDependencies": {
+    "astro": ">=5",
     "next": ">=15",
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "astro": { "optional": true },
+    "next": { "optional": true },
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

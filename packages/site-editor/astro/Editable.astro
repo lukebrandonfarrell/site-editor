@@ -1,0 +1,36 @@
+---
+import {
+  isOpenEditing,
+  loadPublishedState,
+  resolveEditableText,
+  type PublishedState,
+} from "@thereactnativerewind/site-editor/astro";
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const rendered = await Astro.slots.render("default");
+const seed = rendered
+  .replace(/<[^>]*>/g, "")
+  .replace(/&amp;/g, "&")
+  .replace(/&lt;/g, "<")
+  .replace(/&gt;/g, ">")
+  .replace(/&quot;/g, '"')
+  .trim();
+const locals = Astro.locals as { siteEditor?: boolean; siteEditorState?: PublishedState };
+if (!locals.siteEditorState) locals.siteEditorState = await loadPublishedState();
+const value = await resolveEditableText(id, seed, locals.siteEditorState);
+const open = isOpenEditing();
+locals.siteEditor = true;
+---
+
+<span data-site-editor-spot={id}>{value}</span>
+<meta name="site-editor-open" content={open ? "true" : "false"} />
+
+<script>
+  import { mountSiteEditor } from "@thereactnativerewind/site-editor/astro/editor";
+
+  mountSiteEditor();
+</script>

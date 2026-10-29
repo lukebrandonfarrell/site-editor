@@ -2,7 +2,8 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { readConfig } from "../config.js";
-import { displayedText, type ContentSource } from "../content/display.js";
+import type { ContentSource } from "../content/display.js";
+import { resolveFromState } from "../content/published.js";
 import { seedSpot } from "../content/service.js";
 import { isDbUnavailable } from "../errors.js";
 import { createSnapshotStore } from "../snapshot.js";
@@ -49,25 +50,11 @@ export const getPublishedContent = cache(
 export async function resolveSpot(id: string, seed: string): Promise<string> {
   const config = readConfig();
   const state = await getPublishedContent();
-  if (state.source !== "database") {
-    return displayedText({
-      seed,
-      source: state.source,
-      published: state.content[id]?.value,
-    });
-  }
-  if (id in state.content) {
-    return displayedText({ seed, source: "database", published: state.content[id]?.value });
-  }
-  try {
-    const stores = createPostgresStores(requireDatabaseUrl());
-    const seeded = await seedSpot(stores.content, config.siteId, id, seed.trim(), {
+  return resolveFromState(state, id, seed, async () => {
+    const seeded = await seedSpot(createPostgresStores(requireDatabaseUrl()).content, config.siteId, id, seed.trim(), {
       maxTextLength: config.maxTextLength,
       maxSpots: config.maxSpots,
     });
     return seeded.value;
-  } catch (error) {
-    if (isDbUnavailable(error)) return displayedText({ seed, source: "seed", published: undefined });
-    throw error;
-  }
+  });
 }

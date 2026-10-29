@@ -2,6 +2,13 @@
 
 All notable changes to Site Editor are documented here. The package is not yet published to npm. Versions below describe the source on `main`.
 
+## 0.2.0
+
+- Astro adapter at `@thereactnativerewind/site-editor/astro`, with `<Editable>` and a JavaScript toolbar (no React).
+- Astro pages are server-rendered and cached at the CDN for a few seconds. Publish purges the `site-editor` cache tag.
+- Demo app in `apps/demo-astro`.
+- `prepare` builds the package so it can be installed from git before it is on npm.
+
 ## 0.1.0
 
 - Inline text editing for spots marked with `<Editable id>`.

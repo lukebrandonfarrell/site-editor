@@ -1,0 +1,50 @@
+---
+export const prerender = false;
+
+import { applyEditableCacheHeaders } from "@thereactnativerewind/site-editor/astro";
+import Editable from "@thereactnativerewind/site-editor/astro/Editable.astro";
+import "../styles/global.css";
+
+applyEditableCacheHeaders(Astro.response);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harbor & Co. — Astro</title>
+    <meta name="description" content="An Astro page whose copy can be edited in place with Site Editor." />
+  </head>
+  <body>
+    <main class="page">
+      <header class="nav">
+        <Editable id="brand.name">Harbor & Co.</Editable>
+        <span>Astro</span>
+      </header>
+      <section class="hero">
+        <p class="kicker"><Editable id="hero.kicker">Houses & public rooms</Editable></p>
+        <h1><Editable id="hero.title">Rooms that hold the light.</Editable></h1>
+        <p class="lede">
+          <Editable id="hero.lede">
+            Harbor designs quiet houses, libraries, and public rooms for people who live with books and weather.
+          </Editable>
+        </p>
+      </section>
+      <section class="work">
+        <h2><Editable id="work.heading">Selected work</Editable></h2>
+        <article>
+          <strong><Editable id="work.1.title">The lime house</Editable></strong>
+          <p>
+            <Editable id="work.1.body">A courtyard house in Lisbon. Thick walls, a fig tree, one long table.</Editable>
+          </p>
+        </article>
+      </section>
+      <footer>
+        <p>
+          This page is server-rendered. Publish updates the CDN within a few seconds. On a preview deployment the
+          Edit button is in the corner. On production, open <code>/?site-editor=login</code>.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

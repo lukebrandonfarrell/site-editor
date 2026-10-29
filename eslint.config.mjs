@@ -5,6 +5,8 @@ export default tseslint.config(
     ignores: [
       "**/dist/**",
       "**/.next/**",
+      "**/.astro/**",
+      "**/.vercel/**",
       "**/node_modules/**",
       "package-lock.json",
       "apps/demo/next-env.d.ts",

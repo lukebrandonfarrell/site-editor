@@ -5,7 +5,7 @@
 
 ![Editing a headline and publishing it live](docs/demo.gif)
 
-**Clients edit the words on a live Next.js site. Publish shows up in a second or two, with no pull request and no rebuild.**
+**Clients edit the words on a live Next.js or Astro site. Publish shows up in a second or two, with no pull request and no rebuild.**
 
 Site Editor is an open-source plug-in from [The React Native Rewind](https://github.com/lukebrandonfarrell/site-editor). Developers mark the spots that can change. Clients point, type, and publish. Everyone else still sees the site as a normal page.
 
@@ -24,6 +24,7 @@ Site Editor is an open-source plug-in from [The React Native Rewind](https://git
 - Preview deployments (`VERCEL_ENV=preview`) and local dev open the editor with no login. Production requires a magic link to an allowlisted email.
 - Resend sends the link. With no API key, the link is printed in the server log.
 - Text length, body size, and request rate limits are on by default.
+- First-class Next.js and Astro adapters. The Astro toolbar is plain JavaScript, with no React on the page.
 
 ## How it works
 
@@ -35,8 +36,8 @@ flowchart TD
   draft --> db
   publish["Publish"] --> db
   publish --> snap["Snapshot file or Vercel Blob"]
-  publish --> cache["revalidateTag + revalidatePath"]
-  cache --> page["Live page, about a second later"]
+  publish --> cache["Next.js revalidate, or Astro CDN tag purge"]
+  cache --> page["Live page, within a few seconds"]
   db --> page
   db -.->|unreachable| snap
   snap -.->|no snapshot yet| code
@@ -135,6 +136,70 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+## Astro quickstart
+
+For an Astro site on `@astrojs/vercel`. The editor core is shared with Next.js. The toolbar is a small script, not a React island.
+
+The package is not on npm yet. Install the workspace package from this branch. `prepare` compiles TypeScript on install, because `dist` is not committed.
+
+```json
+"@thereactnativerewind/site-editor": "github:lukebrandonfarrell/site-editor#cursor/site-editor-v1-1dfc&path:packages/site-editor"
+```
+
+```bash
+pnpm add "@thereactnativerewind/site-editor@github:lukebrandonfarrell/site-editor#cursor/site-editor-v1-1dfc&path:packages/site-editor"
+```
+
+pnpm and Yarn accept the `path:` segment. npm does not: it ignores it and tries to install the private workspace root. Use pnpm or Yarn until the package is published. In this monorepo the demos depend on the workspace copy directly.
+
+**1. Adapter.** Server output, so pages that contain `<Editable>` are rendered on demand.
+
+```js
+// astro.config.mjs
+import vercel from "@astrojs/vercel";
+import { defineConfig } from "astro/config";
+
+export default defineConfig({
+  output: "server",
+  adapter: vercel(),
+});
+```
+
+**2. API route.**
+
+```ts
+// src/pages/api/site-editor/[...path].ts
+export const prerender = false;
+
+export { ALL, DELETE, GET, POST, PUT } from "@thereactnativerewind/site-editor/astro";
+```
+
+**3. Mark copy.** The component sets CDN cache headers. The page must opt out of prerender so those headers are real.
+
+```astro
+---
+// src/pages/index.astro
+export const prerender = false;
+import { applyEditableCacheHeaders } from "@thereactnativerewind/site-editor/astro";
+import Editable from "@thereactnativerewind/site-editor/astro/Editable.astro";
+
+applyEditableCacheHeaders(Astro.response);
+---
+<h1><Editable id="hero.title">Rooms that hold the light.</Editable></h1>
+```
+
+Call `applyEditableCacheHeaders` from the page frontmatter, before any HTML is sent. A component rendered in the body is too late to set CDN headers.
+
+**4. Environment and migrate.** Same variables as Next.js: `DATABASE_URL`, and for production login `SITE_EDITOR_ALLOWED_EMAILS`, `RESEND_API_KEY`, and `SITE_EDITOR_FROM_EMAIL`. Use a distinct `SITE_EDITOR_SITE_ID` if this site shares a database with another app.
+
+```bash
+DATABASE_URL="postgres://..." npx site-editor migrate
+```
+
+**Cache tradeoff.** `<Editable>` sends `Cache-Control: public, max-age=0, s-maxage=5, stale-while-revalidate=30` and tags the response `site-editor`. Browsers do not cache the HTML. Vercel’s CDN may cache it for about 5 seconds, and may serve one stale response while it refreshes. Publish calls `invalidateByTag("site-editor")` from `@vercel/functions`, so a Vercel deployment drops that CDN entry immediately and the next view is fresh. If the purge cannot run, the old HTML lasts at most a few seconds. Pages must be server-rendered (`output: 'server'` or `export const prerender = false`). A fully static build would bake the copy until the next deploy.
+
+`apps/demo-astro` is this setup. `npm run dev -w site-editor-demo-astro` starts it on port 4321.
 
 ## Configuration
 
