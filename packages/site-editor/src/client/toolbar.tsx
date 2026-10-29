@@ -1,111 +1,116 @@
 "use client";
 
-import { useState } from "react";
-import type { VersionSummary } from "../types.js";
+import { useEffect, useState } from "react";
+import { publishIsQuiet, publishLabel, type PublishPhase } from "./publish-state.js";
+
+function Chevron({ direction }: { direction: "up" | "down" }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d={direction === "down" ? "M3.5 6.5 8 11l4.5-4.5" : "M3.5 9.5 8 5l4.5 4.5"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function EditorChrome({
-  open,
+  showBar,
+  minimized,
   authenticated,
-  email,
-  editing,
+  pending,
+  phase,
+  notice,
   loginOpen,
-  historyOpen,
-  versions,
-  status,
-  error,
+  loginStatus,
+  loginError,
   busy,
-  onEdit,
-  onDone,
   onPublish,
-  onUndo,
-  onRestore,
-  onToggleHistory,
+  onMinimize,
+  onShow,
   onLogin,
   onCloseLogin,
   onLogout,
 }: {
-  open: boolean;
+  showBar: boolean;
+  minimized: boolean;
   authenticated: boolean;
-  email: string | null;
-  editing: boolean;
+  pending: number;
+  phase: PublishPhase;
+  notice: string;
   loginOpen: boolean;
-  historyOpen: boolean;
-  versions: VersionSummary[];
-  status: string;
-  error: string;
+  loginStatus: string;
+  loginError: string;
   busy: boolean;
-  onEdit: () => void;
-  onDone: () => void;
   onPublish: () => void;
-  onUndo: () => void;
-  onRestore: (version: number) => void;
-  onToggleHistory: () => void;
+  onMinimize: () => void;
+  onShow: () => void;
   onLogin: (email: string) => Promise<void>;
   onCloseLogin: () => void;
   onLogout: () => void;
 }) {
   const [address, setAddress] = useState("");
-  const showLaunch = !editing && (open || authenticated);
-  const showLogin = loginOpen && !authenticated && !open;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const quiet = publishIsQuiet(pending, phase);
+  const label = publishLabel(pending, phase);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [menuOpen]);
 
   return (
     <>
-      {showLaunch ? (
-        <button type="button" className="site-editor-launch" onClick={onEdit}>
-          Edit
+      {minimized ? (
+        <button type="button" className="site-editor-launch" aria-label="Show editor" onClick={onShow}>
+          <Chevron direction="up" />
         </button>
       ) : null}
-      {editing ? (
+      {showBar ? (
         <div className="site-editor-bar" role="toolbar" aria-label="Site Editor">
-          <span className="site-editor-brand">Site Editor</span>
-          <span className={error ? "site-editor-status site-editor-error" : "site-editor-status"}>
-            {error || status || (email ? email : "Preview")}
-          </span>
-          <button type="button" onClick={onUndo} disabled={busy || versions.length < 2}>
-            Undo
+          <button type="button" className="site-editor-icon" aria-label="Hide editor" onClick={onMinimize}>
+            <Chevron direction="down" />
           </button>
-          <button type="button" onClick={onToggleHistory} disabled={busy}>
-            History
-          </button>
+          {notice ? <span className="site-editor-status site-editor-error">{notice}</span> : null}
           {authenticated ? (
-            <button type="button" onClick={onLogout} disabled={busy}>
-              Log out
-            </button>
+            <div className="site-editor-overflow" onPointerDown={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                className="site-editor-icon"
+                aria-label="More"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                ···
+              </button>
+              {menuOpen ? (
+                <div className="site-editor-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={onLogout} disabled={busy}>
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           ) : null}
-          <button type="button" onClick={onDone} disabled={busy}>
-            Done
-          </button>
-          <button type="button" className="site-editor-publish" onClick={onPublish} disabled={busy}>
-            Publish
+          <button
+            type="button"
+            className={quiet ? "site-editor-publish site-editor-publish-quiet" : "site-editor-publish"}
+            onClick={onPublish}
+            disabled={busy || pending === 0}
+            aria-live="polite"
+          >
+            {label}
           </button>
         </div>
       ) : null}
-      {historyOpen && editing ? (
-        <aside className="site-editor-history" aria-label="Version history">
-          <h2>Published versions</h2>
-          {versions.length === 0 ? (
-            <p>Nothing has been published yet. Publish to save a snapshot you can restore.</p>
-          ) : (
-            <ul>
-              {versions.map((version) => (
-                <li key={version.version}>
-                  <strong>
-                    Version {version.version}
-                    {version.restoredFrom ? ` · restored from ${version.restoredFrom}` : ""}
-                  </strong>
-                  <p>
-                    {new Date(version.createdAt).toLocaleString()} · {version.actor ?? "Unknown"}
-                  </p>
-                  <button type="button" onClick={() => onRestore(version.version)} disabled={busy}>
-                    Restore
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
-      ) : null}
-      {showLogin ? (
+      {loginOpen && !authenticated ? (
         <div className="site-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="site-editor-login-title">
           <form
             className="site-editor-card"
@@ -125,8 +130,8 @@ export function EditorChrome({
               value={address}
               onChange={(event) => setAddress(event.target.value)}
             />
-            {error ? <p className="site-editor-error">{error}</p> : null}
-            {status ? <p>{status}</p> : null}
+            {loginError ? <p className="site-editor-error">{loginError}</p> : null}
+            {loginStatus ? <p>{loginStatus}</p> : null}
             <button type="submit" className="site-editor-publish" disabled={busy}>
               Email me a link
             </button>

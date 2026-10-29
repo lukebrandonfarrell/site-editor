@@ -12,6 +12,10 @@ export declare class SchemaMissingError extends Error {
     readonly code = "schema_missing";
     constructor();
 }
+export declare class SchemaOutdatedError extends Error {
+    readonly code = "schema_outdated";
+    constructor(message?: string);
+}
 export declare class HttpError extends Error {
     readonly status: number;
     readonly code: string;

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { applyPendingMigrations, loadMigrationFiles, readSchemaVersion } from "../schema/migrate.js";
 const command = process.argv[2] ?? "migrate";
 if (command !== "migrate") {
     console.error("Usage: site-editor migrate");
@@ -42,10 +43,6 @@ if (!databaseUrl) {
     console.error("DATABASE_URL is required. Example: postgres://postgres:postgres@localhost:5432/site_editor");
     process.exit(1);
 }
-const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "../../migrations");
-const migrations = readdirSync(migrationsDir)
-    .filter((file) => file.endsWith(".sql"))
-    .sort();
 const local = /@(localhost|127\.0\.0\.1)(:|\/)/.test(databaseUrl);
 const client = new pg.Client({
     connectionString: databaseUrl,
@@ -53,12 +50,17 @@ const client = new pg.Client({
 });
 try {
     await client.connect();
-    for (const file of migrations) {
-        await client.query(readFileSync(join(migrationsDir, file), "utf8"));
-        console.log(`Applied ${file}`);
+    const result = await applyPendingMigrations(client, loadMigrationFiles());
+    if (result.applied.length === 0) {
+        const version = await readSchemaVersion(client);
+        console.log(`Schema is current (version ${version}).`);
+    }
+    else {
+        for (const file of result.applied)
+            console.log(`Applied ${file}`);
+        console.log(`Site Editor migration applied (version ${result.version}).`);
     }
     const tables = await client.query(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'site_editor_%' ORDER BY tablename`);
-    console.log("Site Editor migration applied.");
     for (const row of tables.rows)
         console.log(`  ${row.tablename}`);
 }

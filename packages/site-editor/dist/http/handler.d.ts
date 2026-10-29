@@ -13,3 +13,5 @@ export type SiteEditorHandlerDeps = {
     now?: () => Date;
 };
 export declare function createSiteEditorHandler(deps: SiteEditorHandlerDeps): (req: Request) => Promise<Response>;
+/** JSON the editor client can read without treating the page as a crash. */
+export declare function editorUnavailableResponse(error: unknown): Response;

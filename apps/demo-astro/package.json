@@ -9,8 +9,8 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/vercel": "^9.0.4",
-    "@thereactnativerewind/site-editor": "0.2.0",
-    "astro": "^5.15.9"
+    "@astrojs/vercel": "9.0.5",
+    "@thereactnativerewind/site-editor": "0.2.2",
+    "astro": "5.18.2"
   }
 }

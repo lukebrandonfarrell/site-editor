@@ -1,7 +1,8 @@
 import { isEmailAllowed, normalizeEmail, parseAllowlist } from "../auth/allowlist.js";
 import { hashToken, newToken } from "../auth/tokens.js";
 import { publishSite, restoreSite, saveDraft, undoSite } from "../content/service.js";
-import { ContentError, DatabaseUnavailableError, HttpError, SchemaMissingError, isDbUnavailable, } from "../errors.js";
+import { ContentError, DatabaseUnavailableError, HttpError, SchemaMissingError, SchemaOutdatedError, isDbUnavailable, } from "../errors.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { draftMap, parseTextContent, publishedMap } from "../validate.js";
 import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from "./cookies.js";
 import { isSecureOrigin, requestOrigin } from "./origin.js";
@@ -92,6 +93,8 @@ export function createSiteEditorHandler(deps) {
     }
     return async function handle(req) {
         try {
+            if (deps.config.databaseUrl)
+                await ensureCurrentSchema(deps.config.databaseUrl);
             if (req.method !== "GET" && req.method !== "HEAD") {
                 assertEditorHeader(req);
                 assertSameOrigin(req, process.env);
@@ -267,6 +270,19 @@ export function createSiteEditorHandler(deps) {
         return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(isSecureOrigin(origin)) });
     }
 }
+/** JSON the editor client can read without treating the page as a crash. */
+export function editorUnavailableResponse(error) {
+    const code = error instanceof SchemaOutdatedError
+        ? "schema_outdated"
+        : error instanceof SchemaMissingError
+            ? "schema_missing"
+            : error instanceof DatabaseUnavailableError || isDbUnavailable(error)
+                ? "database_unavailable"
+                : "unavailable";
+    const message = error instanceof Error ? error.message : "Site Editor is unavailable.";
+    console.warn("[site-editor] Editor API is unavailable.", message);
+    return json({ authenticated: false, open: false, enabled: false, error: code, message }, 503);
+}
 function toErrorResponse(error) {
     if (error instanceof HttpError) {
         const headers = {};
@@ -278,11 +294,11 @@ function toErrorResponse(error) {
         const status = error.code === "spot_not_found" || error.code === "version_not_found" ? 404 : 400;
         return json({ error: error.code, message: error.message }, status);
     }
-    if (error instanceof SchemaMissingError) {
-        return json({ error: error.code, message: error.message }, 503);
-    }
-    if (error instanceof DatabaseUnavailableError || isDbUnavailable(error)) {
-        return json({ error: "database_unavailable", message: "The database is unreachable. Try again shortly." }, 503);
+    if (error instanceof SchemaOutdatedError ||
+        error instanceof SchemaMissingError ||
+        error instanceof DatabaseUnavailableError ||
+        isDbUnavailable(error)) {
+        return editorUnavailableResponse(error);
     }
     console.error("[site-editor] Request failed.", error);
     return json({ error: "internal", message: "Something went wrong." }, 500);

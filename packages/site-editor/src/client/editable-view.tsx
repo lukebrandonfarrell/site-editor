@@ -12,11 +12,12 @@ export function EditableView({
   publishedValue: string;
   className?: string;
 }) {
-  const { editing, drafts, saveDraft } = useDrafts();
+  const { editing, drafts, published, saveDraft } = useDrafts();
+  const value = drafts[id] ?? published[id] ?? publishedValue;
   if (!editing) {
     return (
       <span data-site-editor-spot={id} className={className}>
-        {publishedValue}
+        {value}
       </span>
     );
   }
@@ -24,8 +25,8 @@ export function EditableView({
     <EditableField
       id={id}
       className={className}
-      value={drafts[id] ?? publishedValue}
-      onSave={(value) => saveDraft(id, value)}
+      value={value}
+      onSave={(next) => saveDraft(id, next)}
     />
   );
 }

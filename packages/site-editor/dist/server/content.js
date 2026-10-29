@@ -4,7 +4,7 @@ import { cache } from "react";
 import { readConfig } from "../config.js";
 import { resolveFromState } from "../content/published.js";
 import { seedSpot } from "../content/service.js";
-import { isDbUnavailable } from "../errors.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { createSnapshotStore } from "../snapshot.js";
 import { createPostgresStores } from "../store/postgres.js";
 import { publishedMap } from "../validate.js";
@@ -27,16 +27,21 @@ export const getPublishedContent = cache(async () => {
     if (!config.databaseUrl)
         return { content: {}, source: "seed" };
     try {
+        await ensureCurrentSchema(config.databaseUrl);
         const content = await loadPublishedCached(config.siteId);
         return { content, source: "database" };
     }
     catch (error) {
-        if (!isDbUnavailable(error))
-            throw error;
-        const snapshot = await createSnapshotStore().read(config.siteId);
-        if (!snapshot)
-            return { content: {}, source: "seed" };
-        return { content: snapshot.content, source: "snapshot" };
+        console.warn("[site-editor] Published content is unavailable. Serving the snapshot or seed.", error instanceof Error ? error.message : error);
+        try {
+            const snapshot = await createSnapshotStore().read(config.siteId);
+            if (snapshot)
+                return { content: snapshot.content, source: "snapshot" };
+        }
+        catch (snapshotError) {
+            console.warn("[site-editor] Snapshot read failed. Serving seed text.", snapshotError instanceof Error ? snapshotError.message : snapshotError);
+        }
+        return { content: {}, source: "seed" };
     }
 });
 export async function resolveSpot(id, seed) {

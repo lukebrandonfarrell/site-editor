@@ -1,30 +1,42 @@
 import { readConfig } from "../config.js";
 import { displayedText } from "./display.js";
-import { seedSpot } from "./service.js";
-import { isDbUnavailable } from "../errors.js";
+import { readPublishedOrSnapshot, seedSpot } from "./service.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { createSnapshotStore } from "../snapshot.js";
 import { createPostgresStores } from "../store/postgres.js";
-import { publishedMap } from "../validate.js";
 /**
  * Read published copy without any framework cache.
  * Next.js wraps this in `unstable_cache`. Astro calls it on each origin render
  * and lets the CDN hold the HTML for a few seconds.
  */
+function warn(message, error) {
+    console.warn(`[site-editor] ${message}`, error instanceof Error ? error.message : error);
+}
 export async function loadPublishedState() {
-    const config = readConfig();
-    if (!config.databaseUrl)
-        return { content: {}, source: "seed" };
     try {
-        const spots = await createPostgresStores(config.databaseUrl).content.listSpots(config.siteId);
-        return { content: publishedMap(spots), source: "database" };
+        const config = readConfig();
+        if (!config.databaseUrl)
+            return { content: {}, source: "seed" };
+        try {
+            await ensureCurrentSchema(config.databaseUrl);
+            return await readPublishedOrSnapshot(createPostgresStores(config.databaseUrl).content, createSnapshotStore(), config.siteId);
+        }
+        catch (error) {
+            warn("Database read failed. Trying the published snapshot.", error);
+            try {
+                const snapshot = await createSnapshotStore().read(config.siteId);
+                if (snapshot)
+                    return { content: snapshot.content, source: "snapshot" };
+            }
+            catch (snapshotError) {
+                warn("Snapshot read failed. Serving seed text.", snapshotError);
+            }
+            return { content: {}, source: "seed" };
+        }
     }
     catch (error) {
-        if (!isDbUnavailable(error))
-            throw error;
-        const snapshot = await createSnapshotStore().read(config.siteId);
-        if (!snapshot)
-            return { content: {}, source: "seed" };
-        return { content: snapshot.content, source: "snapshot" };
+        warn("Published content is unavailable. Serving seed text.", error);
+        return { content: {}, source: "seed" };
     }
 }
 export async function resolveFromState(state, id, seed, seedMissing) {
@@ -46,10 +58,8 @@ export async function resolveFromState(state, id, seed, seedMissing) {
         return await seedMissing();
     }
     catch (error) {
-        if (isDbUnavailable(error)) {
-            return displayedText({ seed, source: "seed", published: undefined });
-        }
-        throw error;
+        warn(`Spot "${id}" could not be stored. Serving its seed.`, error);
+        return displayedText({ seed, source: "seed", published: undefined });
     }
 }
 /** Resolve one spot, seeding it in Postgres the first time the database is up. */

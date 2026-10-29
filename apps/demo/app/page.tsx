@@ -88,7 +88,7 @@ export default function HomePage() {
           <Editable id="footer.line">Lisbon & Portland</Editable>
         </span>
         <p className="hint">
-          Preview deployments show the Edit button immediately. On production, visit{" "}
+          On a preview deployment the words are editable straight away. On production, visit{" "}
           <code>/?site-editor=login</code> and sign in with an allowlisted email. Drafts stay off the
           live page until you publish.
         </p>

@@ -1,11 +1,14 @@
 {
   "name": "@thereactnativerewind/site-editor",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Plug-in visual editor so clients can edit marked copy on a live Next.js or Astro site without a pull request or rebuild.",
   "license": "MIT",
   "author": "Luke Brandon Farrell",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "styles.css",
+    "*.css"
+  ],
   "keywords": [
     "nextjs",
     "astro",
@@ -32,6 +35,7 @@
   "files": [
     "dist",
     "astro",
+    "styles.css",
     "migrations",
     "README.md"
   ],
@@ -69,12 +73,13 @@
       "import": "./dist/astro/middleware.js",
       "default": "./dist/astro/middleware.js"
     },
-    "./astro/Editable.astro": "./astro/Editable.astro"
+    "./astro/Editable.astro": "./astro/Editable.astro",
+    "./styles.css": "./styles.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts",
+    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts test/schema.test.ts test/publish-state.test.ts",
     "test:postgres": "tsx --test test/postgres.integration.test.ts",
     "migrate": "node dist/cli/migrate.js",
     "prepublishOnly": "npm run build"
@@ -89,12 +94,14 @@
     "@vercel/blob": "^2.8.2"
   },
   "peerDependencies": {
+    "@astrojs/vercel": ">=8",
     "astro": ">=5",
     "next": ">=15",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
+    "@astrojs/vercel": { "optional": true },
     "astro": { "optional": true },
     "next": { "optional": true },
     "react": { "optional": true },

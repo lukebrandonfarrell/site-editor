@@ -1,13 +1,21 @@
+import { shouldShowEditorChrome } from "../client/chrome.js";
+import { pendingChangeCount, publishIsQuiet, publishLabel, textValueMap, } from "../client/publish-state.js";
 import { editorStyles } from "../client/styles.js";
+export { shouldRevealEditor, shouldShowEditorChrome } from "../client/chrome.js";
 const API = "/api/site-editor";
+const CHEVRON_DOWN = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6.5 8 11l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEVRON_UP = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 9.5 8 5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 let mounted = false;
-export function mountSiteEditor() {
+export function mountSiteEditor(options) {
     if (mounted || typeof document === "undefined")
         return;
     mounted = true;
-    const style = document.createElement("style");
-    style.textContent = editorStyles;
-    document.head.append(style);
+    const external = document.querySelector('meta[name="site-editor-styles"]')?.getAttribute("content") === "external";
+    if (options?.injectStyles !== false && !external) {
+        const style = document.createElement("style");
+        style.textContent = editorStyles;
+        document.head.append(style);
+    }
     const open = document.querySelector('meta[name="site-editor-open"]')?.getAttribute("content") === "true";
     const ui = createUi(open);
     document.body.append(ui.root);
@@ -16,24 +24,35 @@ export function mountSiteEditor() {
 function createUi(openByDefault) {
     const root = document.createElement("div");
     root.className = "site-editor-root";
-    const launch = button("Edit", "site-editor-launch");
+    const show = iconButton(CHEVRON_UP, "Show editor", "site-editor-launch");
+    show.hidden = true;
     const bar = document.createElement("div");
     bar.className = "site-editor-bar";
     bar.setAttribute("role", "toolbar");
+    bar.setAttribute("aria-label", "Site Editor");
     bar.hidden = true;
+    const hide = iconButton(CHEVRON_DOWN, "Hide editor", "site-editor-icon");
     const status = document.createElement("span");
     status.className = "site-editor-status";
-    const undo = button("Undo");
-    const history = button("History");
-    const done = button("Done");
-    const publish = button("Publish", "site-editor-publish");
-    const logout = button("Log out");
-    logout.hidden = true;
-    bar.append(brand(), status, undo, history, logout, done, publish);
-    const historyPanel = document.createElement("aside");
-    historyPanel.className = "site-editor-history";
-    historyPanel.hidden = true;
-    historyPanel.setAttribute("aria-label", "Version history");
+    status.hidden = true;
+    const overflow = document.createElement("div");
+    overflow.className = "site-editor-overflow";
+    overflow.hidden = true;
+    const more = iconButton("", "More", "site-editor-icon");
+    more.textContent = "···";
+    more.setAttribute("aria-haspopup", "menu");
+    const menu = document.createElement("div");
+    menu.className = "site-editor-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "menu");
+    const signOut = button("Sign out");
+    signOut.setAttribute("role", "menuitem");
+    menu.append(signOut);
+    overflow.append(more, menu);
+    const publish = button("Publish", "site-editor-publish site-editor-publish-quiet");
+    publish.disabled = true;
+    publish.setAttribute("aria-live", "polite");
+    bar.append(hide, status, overflow, publish);
     const dialog = document.createElement("div");
     dialog.className = "site-editor-dialog";
     dialog.hidden = true;
@@ -51,31 +70,43 @@ function createUi(openByDefault) {
     const cancel = button("Cancel");
     form.append(heading("Sign in to edit"), paragraph("We’ll email a one-time link to an allowlisted address."), email, loginStatus, send, cancel);
     dialog.append(form);
-    root.append(launch, bar, historyPanel, dialog);
+    root.append(show, bar, dialog);
     let authenticated = false;
     let editing = false;
     let busy = false;
-    launch.addEventListener("click", () => {
-        if (openByDefault || authenticated)
-            void enter();
-        else
-            dialog.hidden = false;
+    let phase = "idle";
+    let published = {};
+    let drafts = {};
+    let confirmTimer = 0;
+    hide.addEventListener("click", () => minimize());
+    show.addEventListener("click", () => reveal());
+    more.addEventListener("click", (event) => {
+        event.stopPropagation();
+        menu.hidden = !menu.hidden;
+        more.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
     });
-    done.addEventListener("click", () => leave());
+    document.addEventListener("click", (event) => {
+        if (event.target instanceof Node && overflow.contains(event.target))
+            return;
+        menu.hidden = true;
+        more.setAttribute("aria-expanded", "false");
+    });
+    signOut.addEventListener("click", () => void logOut());
     publish.addEventListener("click", () => void publishDrafts());
-    undo.addEventListener("click", () => void undoLast());
-    history.addEventListener("click", () => {
-        historyPanel.hidden = !historyPanel.hidden;
-        if (!historyPanel.hidden)
-            void renderHistory();
-    });
-    logout.addEventListener("click", () => void logOut());
     cancel.addEventListener("click", () => {
         dialog.hidden = true;
     });
     form.addEventListener("submit", (event) => {
         event.preventDefault();
         void requestLink(email.value);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (!editing || busy)
+            return;
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            void publishDrafts();
+        }
     });
     document.addEventListener("focusout", (event) => {
         if (!editing)
@@ -90,125 +121,179 @@ function createUi(openByDefault) {
             return;
         void saveDraft(id, target.textContent ?? "");
     });
+    function hideChrome() {
+        show.hidden = true;
+        bar.hidden = true;
+        dialog.hidden = true;
+        menu.hidden = true;
+        editing = false;
+        delete document.documentElement.dataset.siteEditorEditing;
+        delete document.documentElement.dataset.siteEditorChrome;
+    }
     async function start() {
-        const session = await request("/session");
-        authenticated = session.authenticated === true;
-        logout.hidden = !authenticated;
         const flag = new URLSearchParams(window.location.search).get("site-editor");
-        const canEdit = openByDefault || authenticated;
-        launch.hidden = !canEdit && flag !== "login" && flag !== "1";
-        if (flag === "login" || flag === "invalid" || (flag === "1" && !canEdit)) {
-            dialog.hidden = false;
-            if (flag === "invalid")
-                loginStatus.textContent = "That link is invalid or expired.";
+        const loginRequested = flag === "login" || flag === "invalid" || flag === "1";
+        try {
+            const session = await request("/session");
+            if (session.enabled === false)
+                throw new Error("Site Editor is disabled.");
+            authenticated = session.authenticated === true;
+            overflow.hidden = !authenticated;
+            const canEdit = shouldShowEditorChrome({
+                confirmed: true,
+                open: openByDefault,
+                authenticated,
+                failed: false,
+                loginRequested,
+            });
+            if (!canEdit) {
+                hideChrome();
+                return;
+            }
+            document.documentElement.dataset.siteEditorChrome = "on";
+            if (flag === "login" || flag === "invalid" || (flag === "1" && !(openByDefault || authenticated))) {
+                dialog.hidden = false;
+                if (flag === "invalid")
+                    loginStatus.textContent = "That link is invalid or expired.";
+            }
+            if (openByDefault || authenticated)
+                await enter();
         }
-        if (flag === "1" && canEdit)
-            await enter();
+        catch {
+            hideChrome();
+        }
     }
     async function enter() {
         editing = true;
         dialog.hidden = true;
-        launch.hidden = true;
+        show.hidden = true;
         bar.hidden = false;
         document.documentElement.dataset.siteEditorEditing = "true";
         for (const spot of spots())
             spot.contentEditable = "true";
         try {
             const data = await request("/content");
-            const drafts = (data.drafts ?? {});
-            for (const spot of spots()) {
-                const id = spot.getAttribute("data-site-editor-spot");
-                const draft = id ? drafts[id] : undefined;
-                if (draft?.type === "text" && spot.textContent !== draft.value)
-                    spot.textContent = draft.value;
-            }
-            status.textContent = "Editing drafts";
-            await renderHistory();
+            published = textValueMap(data.published);
+            drafts = textValueMap(data.drafts);
+            applyDraftText();
+            clearNotice();
         }
         catch (error) {
-            status.textContent = message(error);
-            status.classList.add("site-editor-error");
+            rememberCurrentText();
+            showNotice(message(error));
         }
+        refreshPublish();
     }
-    function leave() {
+    function minimize() {
         editing = false;
         bar.hidden = true;
-        historyPanel.hidden = true;
-        launch.hidden = false;
+        menu.hidden = true;
+        show.hidden = false;
         delete document.documentElement.dataset.siteEditorEditing;
         for (const spot of spots())
             spot.contentEditable = "false";
     }
+    function reveal() {
+        editing = true;
+        show.hidden = true;
+        bar.hidden = false;
+        document.documentElement.dataset.siteEditorEditing = "true";
+        for (const spot of spots())
+            spot.contentEditable = "true";
+    }
+    function applyDraftText() {
+        for (const spot of spots()) {
+            const id = spot.getAttribute("data-site-editor-spot");
+            if (!id)
+                continue;
+            if (published[id] === undefined)
+                published[id] = spot.textContent ?? "";
+            const draft = drafts[id];
+            if (draft !== undefined && spot.textContent !== draft)
+                spot.textContent = draft;
+        }
+    }
+    function rememberCurrentText() {
+        for (const spot of spots()) {
+            const id = spot.getAttribute("data-site-editor-spot");
+            if (!id)
+                continue;
+            const value = spot.textContent ?? "";
+            if (published[id] === undefined)
+                published[id] = value;
+            if (drafts[id] === undefined)
+                drafts[id] = published[id] ?? value;
+        }
+    }
+    function refreshPublish() {
+        const count = pendingChangeCount(published, drafts);
+        publish.textContent = publishLabel(count, phase);
+        publish.disabled = busy || count === 0;
+        publish.classList.toggle("site-editor-publish-quiet", publishIsQuiet(count, phase));
+    }
+    function clearNotice() {
+        status.hidden = true;
+        status.textContent = "";
+        status.classList.remove("site-editor-error");
+    }
+    function showNotice(text) {
+        status.hidden = false;
+        status.classList.add("site-editor-error");
+        status.textContent = text;
+    }
     async function saveDraft(id, value) {
+        drafts[id] = value;
+        phase = "idle";
+        window.clearTimeout(confirmTimer);
+        refreshPublish();
         try {
             await request("/drafts", {
                 method: "PUT",
                 body: JSON.stringify({ id, content: { type: "text", value } }),
             });
-            status.classList.remove("site-editor-error");
-            status.textContent = "Draft saved";
+            clearNotice();
         }
         catch (error) {
-            status.classList.add("site-editor-error");
-            status.textContent = message(error);
+            showNotice(message(error));
         }
+    }
+    async function flushFocused() {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement))
+            return;
+        const id = active.getAttribute("data-site-editor-spot");
+        if (!id)
+            return;
+        await saveDraft(id, active.textContent ?? "");
     }
     async function publishDrafts() {
         if (busy)
             return;
-        busy = true;
-        status.textContent = "Publishing…";
-        try {
-            const data = await request("/publish", { method: "POST", body: "{}" });
-            status.classList.remove("site-editor-error");
-            status.textContent = `Published version ${String(data.version)}`;
-            window.setTimeout(() => window.location.assign(window.location.pathname), 400);
-        }
-        catch (error) {
-            status.classList.add("site-editor-error");
-            status.textContent = message(error);
-            busy = false;
-        }
-    }
-    async function undoLast() {
-        try {
-            await request("/versions/undo", { method: "POST", body: "{}" });
-            window.location.assign(window.location.pathname);
-        }
-        catch (error) {
-            status.classList.add("site-editor-error");
-            status.textContent = message(error);
-        }
-    }
-    async function renderHistory() {
-        const data = await request("/versions");
-        const versions = (data.versions ?? []);
-        undo.disabled = versions.length < 2;
-        historyPanel.replaceChildren(heading("Published versions"));
-        if (versions.length === 0) {
-            historyPanel.append(paragraph("Nothing has been published yet."));
+        await flushFocused();
+        if (pendingChangeCount(published, drafts) === 0)
             return;
+        busy = true;
+        phase = "publishing";
+        refreshPublish();
+        try {
+            await request("/publish", { method: "POST", body: "{}" });
+            published = { ...published, ...drafts };
+            phase = "published";
+            clearNotice();
+            window.clearTimeout(confirmTimer);
+            confirmTimer = window.setTimeout(() => {
+                phase = "idle";
+                refreshPublish();
+            }, 2200);
         }
-        const list = document.createElement("ul");
-        for (const version of versions) {
-            const item = document.createElement("li");
-            const title = document.createElement("strong");
-            title.textContent = `Version ${version.version}${version.restoredFrom ? ` · restored from ${version.restoredFrom}` : ""}`;
-            const meta = document.createElement("p");
-            meta.textContent = `${new Date(version.createdAt).toLocaleString()} · ${version.actor ?? "Unknown"}`;
-            const restore = button("Restore");
-            restore.addEventListener("click", () => void restoreVersion(version.version));
-            item.append(title, meta, restore);
-            list.append(item);
+        catch (error) {
+            phase = "idle";
+            showNotice(message(error));
         }
-        historyPanel.append(list);
-    }
-    async function restoreVersion(version) {
-        await request("/versions/restore", {
-            method: "POST",
-            body: JSON.stringify({ version }),
-        });
-        window.location.assign(window.location.pathname);
+        finally {
+            busy = false;
+            refreshPublish();
+        }
     }
     async function requestLink(address) {
         loginStatus.textContent = "";
@@ -224,8 +309,27 @@ function createUi(openByDefault) {
         }
     }
     async function logOut() {
+        menu.hidden = true;
         await request("/auth/logout", { method: "POST", body: "{}" });
-        window.location.assign(window.location.pathname);
+        authenticated = false;
+        overflow.hidden = true;
+        for (const spot of spots()) {
+            const id = spot.getAttribute("data-site-editor-spot");
+            if (!id || published[id] === undefined)
+                continue;
+            spot.textContent = published[id];
+        }
+        drafts = { ...published };
+        phase = "idle";
+        refreshPublish();
+        if (openByDefault)
+            return;
+        editing = false;
+        bar.hidden = true;
+        show.hidden = true;
+        delete document.documentElement.dataset.siteEditorEditing;
+        for (const spot of spots())
+            spot.contentEditable = "false";
     }
     return { root, start };
 }
@@ -240,10 +344,13 @@ function button(label, className) {
         element.className = className;
     return element;
 }
-function brand() {
-    const element = document.createElement("span");
-    element.className = "site-editor-brand";
-    element.textContent = "Site Editor";
+function iconButton(svg, label, className) {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = className;
+    element.setAttribute("aria-label", label);
+    if (svg)
+        element.innerHTML = svg;
     return element;
 }
 function heading(text) {
