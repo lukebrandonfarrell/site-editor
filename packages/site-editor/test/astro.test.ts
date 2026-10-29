@@ -5,9 +5,11 @@ import {
   EDITABLE_CACHE_CONTROL,
   applyEditableCacheHeaders,
   createAstroHandlers,
+  GET,
   prerender,
 } from "../src/astro/index.ts";
-import { mountSiteEditor } from "../src/astro/editor-client.ts";
+import { mountSiteEditor, shouldRevealEditor } from "../src/astro/editor-client.ts";
+import { editorStyles } from "../src/client/styles.ts";
 import { resolveEditableText } from "../src/content/published.ts";
 import { seedSpot } from "../src/content/service.ts";
 import { editorRequest, handlerFor, testDeps } from "./helpers.ts";
@@ -54,6 +56,51 @@ test("editable pages advertise a short tagged CDN cache", () => {
   const component = readFileSync(new URL("../astro/Editable.astro", import.meta.url), "utf8");
   assert.match(component, /data-site-editor-spot/);
   assert.match(component, /resolveEditableText/);
+});
+
+test("a closed editor panel stays hidden when its class sets display", () => {
+  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  assert.equal(css.trim(), editorStyles.trim());
+  assert.match(editorStyles, /\.site-editor-root \[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
+  const dialog = editorStyles.indexOf(".site-editor-dialog");
+  const hidden = editorStyles.indexOf(".site-editor-root [hidden]");
+  assert.ok(dialog > 0 && hidden > dialog);
+});
+
+test("the edit button stays hidden when the session request fails", () => {
+  assert.equal(shouldRevealEditor({ open: true, authenticated: false, failed: true, loginRequested: false }), false);
+  assert.equal(shouldRevealEditor({ open: false, authenticated: false, failed: true, loginRequested: true }), false);
+  assert.equal(shouldRevealEditor({ open: true, authenticated: false, failed: false, loginRequested: false }), true);
+});
+
+test("session reports a disabled editor when the database is not configured", async () => {
+  const previous = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  try {
+    const response = await GET({ request: new Request("http://localhost/api/site-editor/session") });
+    assert.equal(response.status, 503);
+    const body = (await response.json()) as { enabled?: boolean; authenticated?: boolean; error?: string };
+    assert.equal(body.enabled, false);
+    assert.equal(body.authenticated, false);
+    assert.equal(body.error, "database_unavailable");
+  } finally {
+    if (previous) process.env.DATABASE_URL = previous;
+  }
+});
+
+test("a database outage during render still returns the seed", async () => {
+  const previousUrl = process.env.DATABASE_URL;
+  const previousSite = process.env.SITE_EDITOR_SITE_ID;
+  process.env.DATABASE_URL = "postgres://site_editor:site_editor@127.0.0.1:1/site_editor";
+  process.env.SITE_EDITOR_SITE_ID = `missing_${Date.now()}`;
+  try {
+    assert.equal(await resolveEditableText("hero.title", "Keep the seed"), "Keep the seed");
+  } finally {
+    if (previousUrl) process.env.DATABASE_URL = previousUrl;
+    else delete process.env.DATABASE_URL;
+    if (previousSite) process.env.SITE_EDITOR_SITE_ID = previousSite;
+    else delete process.env.SITE_EDITOR_SITE_ID;
+  }
 });
 
 test("missing DATABASE_URL renders the code seed", async () => {

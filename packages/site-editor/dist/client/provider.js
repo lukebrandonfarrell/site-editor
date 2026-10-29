@@ -29,7 +29,7 @@ function textMap(content) {
     }
     return next;
 }
-export function SiteEditorProvider({ bootstrap, children, }) {
+export function SiteEditorProvider({ bootstrap, children, injectStyles = true, }) {
     const router = useRouter();
     const api = bootstrap.apiBase;
     const [authenticated, setAuthenticated] = useState(false);
@@ -43,7 +43,8 @@ export function SiteEditorProvider({ bootstrap, children, }) {
     const [status, setStatus] = useState("");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
-    const canEdit = bootstrap.open || authenticated;
+    const [sessionFailed, setSessionFailed] = useState(false);
+    const canEdit = !sessionFailed && (bootstrap.open || authenticated);
     useEffect(() => {
         if (editing)
             document.documentElement.dataset.siteEditorEditing = "true";
@@ -55,14 +56,23 @@ export function SiteEditorProvider({ bootstrap, children, }) {
     }, [editing]);
     const loadSession = useCallback(async () => {
         const response = await fetch(`${api}/session`, { cache: "no-store" });
-        const data = (await response.json());
+        const data = (await response.json().catch(() => ({})));
+        if (!response.ok || data.enabled === false) {
+            setSessionFailed(true);
+            setAuthenticated(false);
+            setReady(true);
+            return false;
+        }
         setAuthenticated(Boolean(data.authenticated));
         setEmail(data.email ?? null);
         setReady(true);
         return Boolean(data.authenticated);
     }, [api]);
     useEffect(() => {
-        void loadSession().catch(() => setReady(true));
+        void loadSession().catch(() => {
+            setSessionFailed(true);
+            setReady(true);
+        });
     }, [loadSession]);
     const loadDrafts = useCallback(async () => {
         const data = await requestJson(`${api}/content`);
@@ -213,7 +223,7 @@ export function SiteEditorProvider({ bootstrap, children, }) {
         else
             setLoginOpen(true);
     };
-    return (_jsxs(DraftContext.Provider, { value: draftValue, children: [_jsx("style", { dangerouslySetInnerHTML: { __html: editorStyles } }), children, _jsx(EditorChrome, { open: bootstrap.open, authenticated: authenticated, email: email, editing: editing, loginOpen: loginOpen, historyOpen: historyOpen, versions: versions, status: status, error: error, busy: busy, onEdit: onEdit, onDone: () => {
+    return (_jsxs(DraftContext.Provider, { value: draftValue, children: [injectStyles ? _jsx("style", { dangerouslySetInnerHTML: { __html: editorStyles } }) : null, children, _jsx(EditorChrome, { open: bootstrap.open, authenticated: authenticated, email: email, editing: editing, loginOpen: loginOpen, historyOpen: historyOpen, versions: versions, status: status, error: error, busy: busy, onEdit: onEdit, onDone: () => {
                     setEditing(false);
                     setHistoryOpen(false);
                     setStatus("");

@@ -1,4 +1,5 @@
 ---
+import "@thereactnativerewind/site-editor/styles.css";
 import {
   isOpenEditing,
   loadPublishedState,
@@ -20,17 +21,27 @@ const seed = rendered
   .replace(/&quot;/g, '"')
   .trim();
 const locals = Astro.locals as { siteEditor?: boolean; siteEditorState?: PublishedState };
-if (!locals.siteEditorState) locals.siteEditorState = await loadPublishedState();
-const value = await resolveEditableText(id, seed, locals.siteEditorState);
-const open = isOpenEditing();
-locals.siteEditor = true;
+let value = seed;
+let open = false;
+try {
+  if (!locals.siteEditorState) locals.siteEditorState = await loadPublishedState();
+  value = await resolveEditableText(id, seed, locals.siteEditorState);
+  open = isOpenEditing();
+  locals.siteEditor = true;
+} catch (error) {
+  console.warn(
+    `[site-editor] Spot "${id}" fell back to its seed.`,
+    error instanceof Error ? error.message : error,
+  );
+}
 ---
 
 <span data-site-editor-spot={id}>{value}</span>
 <meta name="site-editor-open" content={open ? "true" : "false"} />
+<meta name="site-editor-styles" content="external" />
 
 <script>
   import { mountSiteEditor } from "@thereactnativerewind/site-editor/astro/editor";
 
-  mountSiteEditor();
+  mountSiteEditor({ injectStyles: false });
 </script>

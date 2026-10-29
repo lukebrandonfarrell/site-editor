@@ -1,13 +1,22 @@
 import { editorStyles } from "../client/styles.js";
 const API = "/api/site-editor";
 let mounted = false;
-export function mountSiteEditor() {
+/** Closed chrome stays hidden even when a panel sets `display`. */
+export function shouldRevealEditor(input) {
+    if (input.failed)
+        return false;
+    return input.open || input.authenticated || input.loginRequested;
+}
+export function mountSiteEditor(options) {
     if (mounted || typeof document === "undefined")
         return;
     mounted = true;
-    const style = document.createElement("style");
-    style.textContent = editorStyles;
-    document.head.append(style);
+    const external = document.querySelector('meta[name="site-editor-styles"]')?.getAttribute("content") === "external";
+    if (options?.injectStyles !== false && !external) {
+        const style = document.createElement("style");
+        style.textContent = editorStyles;
+        document.head.append(style);
+    }
     const open = document.querySelector('meta[name="site-editor-open"]')?.getAttribute("content") === "true";
     const ui = createUi(open);
     document.body.append(ui.root);
@@ -90,20 +99,42 @@ function createUi(openByDefault) {
             return;
         void saveDraft(id, target.textContent ?? "");
     });
+    function hideChrome() {
+        launch.hidden = true;
+        bar.hidden = true;
+        historyPanel.hidden = true;
+        dialog.hidden = true;
+        delete document.documentElement.dataset.siteEditorEditing;
+    }
     async function start() {
-        const session = await request("/session");
-        authenticated = session.authenticated === true;
-        logout.hidden = !authenticated;
         const flag = new URLSearchParams(window.location.search).get("site-editor");
-        const canEdit = openByDefault || authenticated;
-        launch.hidden = !canEdit && flag !== "login" && flag !== "1";
-        if (flag === "login" || flag === "invalid" || (flag === "1" && !canEdit)) {
-            dialog.hidden = false;
-            if (flag === "invalid")
-                loginStatus.textContent = "That link is invalid or expired.";
+        const loginRequested = flag === "login" || flag === "invalid" || flag === "1";
+        try {
+            const session = await request("/session");
+            if (session.enabled === false)
+                throw new Error("Site Editor is disabled.");
+            authenticated = session.authenticated === true;
+            logout.hidden = !authenticated;
+            const canEdit = shouldRevealEditor({
+                open: openByDefault,
+                authenticated,
+                failed: false,
+                loginRequested,
+            });
+            launch.hidden = !canEdit;
+            if (!canEdit)
+                return;
+            if (flag === "login" || flag === "invalid" || (flag === "1" && !(openByDefault || authenticated))) {
+                dialog.hidden = false;
+                if (flag === "invalid")
+                    loginStatus.textContent = "That link is invalid or expired.";
+            }
+            if (flag === "1" && (openByDefault || authenticated))
+                await enter();
         }
-        if (flag === "1" && canEdit)
-            await enter();
+        catch {
+            hideChrome();
+        }
     }
     async function enter() {
         editing = true;

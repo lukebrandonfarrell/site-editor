@@ -1,4 +1,4 @@
-import { createSiteEditorHandler, type SiteEditorHandlerDeps } from "../http/handler.js";
+import { createSiteEditorHandler, editorUnavailableResponse, type SiteEditorHandlerDeps } from "../http/handler.js";
 import { createDefaultServices } from "../runtime/services.js";
 import { revalidateAstroCache } from "./cache.js";
 
@@ -38,22 +38,30 @@ function liveEndpoints() {
   return endpoints;
 }
 
+async function call(invoke: (endpoints: ReturnType<typeof createAstroHandlers>) => Promise<Response>): Promise<Response> {
+  try {
+    return await invoke(liveEndpoints());
+  } catch (error) {
+    return editorUnavailableResponse(error);
+  }
+}
+
 export function ALL(context: AstroEndpointContext): Promise<Response> {
-  return liveEndpoints().ALL(context);
+  return call((endpoints) => endpoints.ALL(context));
 }
 
 export function GET(context: AstroEndpointContext): Promise<Response> {
-  return liveEndpoints().GET(context);
+  return call((endpoints) => endpoints.GET(context));
 }
 
 export function POST(context: AstroEndpointContext): Promise<Response> {
-  return liveEndpoints().POST(context);
+  return call((endpoints) => endpoints.POST(context));
 }
 
 export function PUT(context: AstroEndpointContext): Promise<Response> {
-  return liveEndpoints().PUT(context);
+  return call((endpoints) => endpoints.PUT(context));
 }
 
 export function DELETE(context: AstroEndpointContext): Promise<Response> {
-  return liveEndpoints().DELETE(context);
+  return call((endpoints) => endpoints.DELETE(context));
 }

@@ -267,6 +267,17 @@ export function createSiteEditorHandler(deps) {
         return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(isSecureOrigin(origin)) });
     }
 }
+/** JSON the editor client can read without treating the page as a crash. */
+export function editorUnavailableResponse(error) {
+    const code = error instanceof SchemaMissingError
+        ? "schema_missing"
+        : error instanceof DatabaseUnavailableError || isDbUnavailable(error)
+            ? "database_unavailable"
+            : "unavailable";
+    const message = error instanceof Error ? error.message : "Site Editor is unavailable.";
+    console.warn("[site-editor] Editor API is unavailable.", message);
+    return json({ authenticated: false, open: false, enabled: false, error: code, message }, 503);
+}
 function toErrorResponse(error) {
     if (error instanceof HttpError) {
         const headers = {};
@@ -278,11 +289,8 @@ function toErrorResponse(error) {
         const status = error.code === "spot_not_found" || error.code === "version_not_found" ? 404 : 400;
         return json({ error: error.code, message: error.message }, status);
     }
-    if (error instanceof SchemaMissingError) {
-        return json({ error: error.code, message: error.message }, 503);
-    }
-    if (error instanceof DatabaseUnavailableError || isDbUnavailable(error)) {
-        return json({ error: "database_unavailable", message: "The database is unreachable. Try again shortly." }, 503);
+    if (error instanceof SchemaMissingError || error instanceof DatabaseUnavailableError || isDbUnavailable(error)) {
+        return editorUnavailableResponse(error);
     }
     console.error("[site-editor] Request failed.", error);
     return json({ error: "internal", message: "Something went wrong." }, 500);

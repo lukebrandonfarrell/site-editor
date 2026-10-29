@@ -1,7 +1,7 @@
 import "server-only";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { readConfig } from "../config.js";
-import { createSiteEditorHandler } from "../http/handler.js";
+import { createSiteEditorHandler, editorUnavailableResponse } from "../http/handler.js";
 import { createDefaultServices } from "../server/services.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,15 +21,23 @@ function getHandler() {
     }
     return handler;
 }
+async function call(req) {
+    try {
+        return await getHandler()(req);
+    }
+    catch (error) {
+        return editorUnavailableResponse(error);
+    }
+}
 export function GET(req) {
-    return getHandler()(req);
+    return call(req);
 }
 export function POST(req) {
-    return getHandler()(req);
+    return call(req);
 }
 export function PUT(req) {
-    return getHandler()(req);
+    return call(req);
 }
 export function DELETE(req) {
-    return getHandler()(req);
+    return call(req);
 }

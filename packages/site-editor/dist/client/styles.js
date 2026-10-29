@@ -144,4 +144,8 @@ html[data-site-editor-editing="true"] body { padding-bottom: 96px; }
 @media (prefers-reduced-motion: reduce) {
   .site-editor-launch, .site-editor-bar, .site-editor-history { transition: none; }
 }
+/* display:flex/grid on the bar and dialog would otherwise beat the hidden attribute. */
+.site-editor-root [hidden] {
+  display: none !important;
+}
 `;

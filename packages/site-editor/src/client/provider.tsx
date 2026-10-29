@@ -40,9 +40,12 @@ function textMap(content: ContentMap | undefined): Record<string, string> {
 export function SiteEditorProvider({
   bootstrap,
   children,
+  injectStyles = true,
 }: {
   bootstrap: SiteEditorBootstrap;
   children: ReactNode;
+  /** Set false and import `@thereactnativerewind/site-editor/styles.css` instead of an inline style tag. */
+  injectStyles?: boolean;
 }) {
   const router = useRouter();
   const api = bootstrap.apiBase;
@@ -57,8 +60,9 @@ export function SiteEditorProvider({
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sessionFailed, setSessionFailed] = useState(false);
 
-  const canEdit = bootstrap.open || authenticated;
+  const canEdit = !sessionFailed && (bootstrap.open || authenticated);
 
   useEffect(() => {
     if (editing) document.documentElement.dataset.siteEditorEditing = "true";
@@ -70,7 +74,17 @@ export function SiteEditorProvider({
 
   const loadSession = useCallback(async () => {
     const response = await fetch(`${api}/session`, { cache: "no-store" });
-    const data = (await response.json()) as { authenticated?: boolean; email?: string | null };
+    const data = (await response.json().catch(() => ({}))) as {
+      authenticated?: boolean;
+      email?: string | null;
+      enabled?: boolean;
+    };
+    if (!response.ok || data.enabled === false) {
+      setSessionFailed(true);
+      setAuthenticated(false);
+      setReady(true);
+      return false;
+    }
     setAuthenticated(Boolean(data.authenticated));
     setEmail(data.email ?? null);
     setReady(true);
@@ -78,7 +92,10 @@ export function SiteEditorProvider({
   }, [api]);
 
   useEffect(() => {
-    void loadSession().catch(() => setReady(true));
+    void loadSession().catch(() => {
+      setSessionFailed(true);
+      setReady(true);
+    });
   }, [loadSession]);
 
   const loadDrafts = useCallback(async () => {
@@ -241,7 +258,7 @@ export function SiteEditorProvider({
 
   return (
     <DraftContext.Provider value={draftValue}>
-      <style dangerouslySetInnerHTML={{ __html: editorStyles }} />
+      {injectStyles ? <style dangerouslySetInnerHTML={{ __html: editorStyles }} /> : null}
       {children}
       <EditorChrome
         open={bootstrap.open}

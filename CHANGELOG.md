@@ -2,6 +2,15 @@
 
 All notable changes to Site Editor are documented here. The package is not yet published to npm. Versions below describe the source on `main`.
 
+## 0.2.1
+
+- Install instructions point at `main`.
+- Closed editor panels stay hidden when their CSS sets `display`.
+- `@thereactnativerewind/site-editor/styles.css` can be linked instead of injecting a style tag. The Astro toolbar uses that file so a strict `style-src-elem` does not need `'unsafe-inline'`.
+- A missing or unreachable database returns HTTP 503 `{ "enabled": false }` from the session route, and the Edit button hides.
+- Page render falls back to seed text instead of returning a server error when the editor cannot read Postgres, the snapshot, or Blob.
+- Document that Astro 5 sites should use `@astrojs/vercel` 9.x. Adapter 11 is for Astro 7.
+
 ## 0.2.0
 
 - Astro adapter at `@thereactnativerewind/site-editor/astro`, with `<Editable>` and a JavaScript toolbar (no React).

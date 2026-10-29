@@ -144,11 +144,11 @@ For an Astro site on `@astrojs/vercel`. The editor core is shared with Next.js. 
 The package is not on npm yet. Install the workspace package from this branch. `packages/site-editor/dist` is committed so the install does not need a build script. pnpm 10 blocks dependency build scripts unless the package is allowlisted, which is why `dist` ships in git until the package is published.
 
 ```json
-"@thereactnativerewind/site-editor": "github:lukebrandonfarrell/site-editor#cursor/site-editor-v1-1dfc&path:packages/site-editor"
+"@thereactnativerewind/site-editor": "github:lukebrandonfarrell/site-editor#main&path:packages/site-editor"
 ```
 
 ```bash
-pnpm add "@thereactnativerewind/site-editor@github:lukebrandonfarrell/site-editor#cursor/site-editor-v1-1dfc&path:packages/site-editor"
+pnpm add "@thereactnativerewind/site-editor@github:lukebrandonfarrell/site-editor#main&path:packages/site-editor"
 ```
 
 pnpm and Yarn accept the `path:` segment. npm does not: it ignores it and tries to install the private workspace root. Use pnpm or Yarn until the package is published. In this monorepo the demos depend on the workspace copy directly.
@@ -175,7 +175,7 @@ export const prerender = false;
 export { ALL, DELETE, GET, POST, PUT } from "@thereactnativerewind/site-editor/astro";
 ```
 
-**3. Mark copy.** The component sets CDN cache headers. The page must opt out of prerender so those headers are real.
+**3. Mark copy.** The page must opt out of prerender and set the CDN headers in its frontmatter. A component lower in the body is too late to change them.
 
 ```astro
 ---
@@ -197,7 +197,13 @@ Call `applyEditableCacheHeaders` from the page frontmatter, before any HTML is s
 DATABASE_URL="postgres://..." npx site-editor migrate
 ```
 
-**Cache tradeoff.** `<Editable>` sends `Cache-Control: public, max-age=0, s-maxage=5, stale-while-revalidate=30` and tags the response `site-editor`. Browsers do not cache the HTML. Vercel’s CDN may cache it for about 5 seconds, and may serve one stale response while it refreshes. Publish calls `invalidateByTag("site-editor")` from `@vercel/functions`, so a Vercel deployment drops that CDN entry immediately and the next view is fresh. If the purge cannot run, the old HTML lasts at most a few seconds. Pages must be server-rendered (`output: 'server'` or `export const prerender = false`). A fully static build would bake the copy until the next deploy.
+**Adapter compatibility.** `@astrojs/vercel` 11 expects Astro 7. An Astro 5 site should stay on adapter 9.x (`"@astrojs/vercel": "^9"` with `"astro": "^5"`). The demo in `apps/demo-astro` is built in CI on Astro 5.18 and adapter 9.0.5. The package peer range allows Astro 5 and later, and `@astrojs/vercel` 8 or later, but those two packages still have to match each other.
+
+**Production install.** Vercel production installs omit `devDependencies`. Anything the server needs at runtime, including `sharp` if you use Astro image optimization, belongs in `dependencies`.
+
+**Styles and CSP.** The Astro component imports `@thereactnativerewind/site-editor/styles.css`, which Vite emits as a stylesheet URL, and it does not inject a `<style>` tag. Link that file yourself if you mount the script by hand, and call `mountSiteEditor({ injectStyles: false })` or set `<meta name="site-editor-styles" content="external" />`. The Next.js provider injects the same CSS by default; pass `injectStyles={false}` and import `styles.css` when you have a strict policy. Injecting a style tag requires `style-src-elem 'unsafe-inline'` (or a hash of that file). A linked stylesheet only needs `style-src-elem 'self'`.
+
+**Cache tradeoff.** `applyEditableCacheHeaders` sets `Cache-Control: public, max-age=0, s-maxage=5, stale-while-revalidate=30` and tags the response `site-editor`. Browsers do not cache the HTML. Vercel’s CDN may cache it for about 5 seconds, and may serve one stale response while it refreshes. Publish calls `invalidateByTag("site-editor")`, so a Vercel deployment drops that CDN entry immediately and the next view is fresh. If the purge cannot run, the old HTML lasts at most a few seconds. Pages must be server-rendered (`output: 'server'` or `export const prerender = false`). A fully static build would bake the copy until the next deploy. If `DATABASE_URL` is missing, the database is down, or the tables are not migrated, the page still renders the seed text and `GET /api/site-editor/session` returns HTTP 503 with `{ "enabled": false }`. The Edit button hides.
 
 `apps/demo-astro` is this setup. `npm run dev -w site-editor-demo-astro` starts it on port 4321.
 
