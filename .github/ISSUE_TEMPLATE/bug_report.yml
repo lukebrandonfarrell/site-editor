@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in Site Editor does not behave the way the docs describe.
+title: ""
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Mark a spot with Editable
+        2. Publish
+        3. Reload
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      placeholder: 0.1.0
+  - type: dropdown
+    id: env
+    attributes:
+      label: Where were you editing
+      options:
+        - Local development
+        - Vercel preview
+        - Vercel production
+        - Somewhere else
+    validations:
+      required: true

@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose a change to Site Editor.
+title: ""
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is stuck, and what are they trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should the editor do? Mention if this is image or spacing support.
+    validations:
+      required: true

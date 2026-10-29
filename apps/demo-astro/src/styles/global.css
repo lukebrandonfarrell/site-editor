@@ -1,0 +1,51 @@
+:root {
+  color-scheme: light;
+  --paper: #efe6d6;
+  --ink: #221c16;
+  --muted: #5e564c;
+  --line: rgba(34, 28, 22, 0.16);
+  --green: #1f6a4a;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  --sans: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background:
+    radial-gradient(800px 360px at 100% -10%, rgba(31, 106, 74, 0.16), transparent 60%),
+    var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.5;
+}
+.page { max-width: 880px; margin: 0 auto; padding: 32px 24px 96px; }
+.nav, footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.nav { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.hero { padding: 48px 0 12px; }
+.kicker { margin: 0 0 12px; color: var(--green); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+h1 {
+  margin: 0;
+  max-width: 12ch;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(56px, 8vw, 92px);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+}
+.lede { max-width: 38rem; color: var(--muted); font-size: 20px; }
+.work { margin-top: 28px; border-top: 1px solid var(--line); }
+.work h2 { font-family: var(--serif); font-weight: 500; font-size: 32px; }
+.work article { display: grid; gap: 8px; padding: 8px 0 20px; }
+.work strong { font-family: var(--serif); font-size: 28px; font-weight: 500; }
+.work p, footer p { margin: 0; color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 16px; }
+footer { margin-top: 28px; }
+code { font-size: 0.95em; }

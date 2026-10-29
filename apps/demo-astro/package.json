@@ -1,0 +1,16 @@
+{
+  "name": "site-editor-demo-astro",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/vercel": "^9.0.4",
+    "@thereactnativerewind/site-editor": "0.2.0",
+    "astro": "^5.15.9"
+  }
+}

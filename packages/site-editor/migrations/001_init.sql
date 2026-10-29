@@ -1,0 +1,69 @@
+-- Site Editor v1 schema. Safe to run more than once.
+-- Content JSON is typed ({ "type": "text", "value": "..." }) so image and
+-- spacing values can be stored later without a table change.
+
+CREATE TABLE IF NOT EXISTS site_editor_sites (
+  site_id TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS site_editor_spots (
+  site_id TEXT NOT NULL REFERENCES site_editor_sites (site_id) ON DELETE CASCADE,
+  spot_id TEXT NOT NULL,
+  draft JSONB NOT NULL,
+  published JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (site_id, spot_id)
+);
+
+CREATE TABLE IF NOT EXISTS site_editor_versions (
+  site_id TEXT NOT NULL REFERENCES site_editor_sites (site_id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  content JSONB NOT NULL,
+  created_by TEXT,
+  restored_from INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (site_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS site_editor_versions_site_idx
+  ON site_editor_versions (site_id, version DESC);
+
+CREATE TABLE IF NOT EXISTS site_editor_magic_links (
+  token_hash TEXT PRIMARY KEY,
+  site_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS site_editor_magic_links_email_idx
+  ON site_editor_magic_links (site_id, email, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS site_editor_sessions (
+  token_hash TEXT PRIMARY KEY,
+  site_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS site_editor_sessions_site_idx
+  ON site_editor_sessions (site_id, email);
+
+CREATE TABLE IF NOT EXISTS site_editor_rate_limits (
+  bucket TEXT PRIMARY KEY,
+  hits INTEGER NOT NULL,
+  window_start TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS site_editor_schema (
+  version INTEGER PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO site_editor_schema (version)
+VALUES (1)
+ON CONFLICT (version) DO NOTHING;

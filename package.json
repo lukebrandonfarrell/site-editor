@@ -1,0 +1,26 @@
+{
+  "name": "site-editor",
+  "private": true,
+  "description": "Monorepo for the Site Editor visual copy editor and its demo site.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @thereactnativerewind/site-editor && npm run build -w site-editor-demo && npm run build -w site-editor-demo-astro",
+    "test": "npm run test -w @thereactnativerewind/site-editor",
+    "test:postgres": "npm run test:postgres -w @thereactnativerewind/site-editor",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck -w @thereactnativerewind/site-editor && npm run build -w @thereactnativerewind/site-editor && npm run typecheck -w site-editor-demo",
+    "migrate": "npm run build -w @thereactnativerewind/site-editor && npm run migrate -w @thereactnativerewind/site-editor",
+    "dev": "npm run build -w @thereactnativerewind/site-editor && npm run dev -w site-editor-demo",
+    "start": "npm run start -w site-editor-demo"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "eslint": "^10.13.0",
+    "typescript-eslint": "^8.72.1"
+  }
+}
