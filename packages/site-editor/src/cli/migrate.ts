@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -45,8 +45,10 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const sqlPath = join(dirname(fileURLToPath(import.meta.url)), "../../migrations/001_init.sql");
-const sql = readFileSync(sqlPath, "utf8");
+const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "../../migrations");
+const migrations = readdirSync(migrationsDir)
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
 const local = /@(localhost|127\.0\.0\.1)(:|\/)/.test(databaseUrl);
 const client = new pg.Client({
   connectionString: databaseUrl,
@@ -55,7 +57,10 @@ const client = new pg.Client({
 
 try {
   await client.connect();
-  await client.query(sql);
+  for (const file of migrations) {
+    await client.query(readFileSync(join(migrationsDir, file), "utf8"));
+    console.log(`Applied ${file}`);
+  }
   const tables = await client.query<{ tablename: string }>(
     `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'site_editor_%' ORDER BY tablename`,
   );

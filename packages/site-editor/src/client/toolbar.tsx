@@ -94,7 +94,7 @@ export function EditorChrome({
                     {version.restoredFrom ? ` · restored from ${version.restoredFrom}` : ""}
                   </strong>
                   <p>
-                    {new Date(version.createdAt).toLocaleString()} · {version.createdBy ?? "preview"}
+                    {new Date(version.createdAt).toLocaleString()} · {version.actor ?? "Unknown"}
                   </p>
                   <button type="button" onClick={() => onRestore(version.version)} disabled={busy}>
                     Restore

@@ -21,7 +21,8 @@ export type ContentMap = Record<string, TextContent>;
 export type VersionSummary = {
   version: number;
   createdAt: string;
-  createdBy: string | null;
+  /** Session email, or `"preview"` when the editor is open without login. */
+  actor: string | null;
   restoredFrom: number | null;
 };
 
@@ -53,4 +54,6 @@ export type SpotRecord = {
   spotId: string;
   draft: TextContent;
   published: TextContent | null;
+  /** Who last saved the draft. Null until someone edits the spot. */
+  updatedBy: string | null;
 };

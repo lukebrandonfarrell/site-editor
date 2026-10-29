@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { displayedText } from "../src/content/display.js";
 import { publishSite, readPublishedOrSnapshot, restoreSite, saveDraft, seedSpot, undoSite } from "../src/content/service.js";
 import { DatabaseUnavailableError } from "../src/errors.js";
 import { MemorySnapshotStore } from "../src/snapshot.js";
@@ -22,14 +23,16 @@ test("drafts do not change the published text until publish", async () => {
   const store = new MemoryContentStore();
   const snapshots = new MemorySnapshotStore();
   await seedSpot(store, "demo", "hero.title", "Initial text", limits);
-  await saveDraft(store, "demo", "hero.title", { type: "text", value: "Edited draft" });
+  await saveDraft(store, "demo", "hero.title", { type: "text", value: "Edited draft" }, "preview");
+  assert.equal((await store.getSpot("demo", "hero.title"))?.updatedBy, "preview");
 
   const before = await readPublishedOrSnapshot(store, snapshots, "demo");
   assert.equal(before.source, "database");
   assert.equal(before.content["hero.title"]?.value, "Initial text");
 
-  const published = await publishSite(store, snapshots, "demo", "editor@example.com");
+  const published = await publishSite(store, snapshots, "demo", "preview");
   assert.equal(published.version, 1);
+  assert.equal((await store.listVersions("demo", 1))[0]?.actor, "preview");
   assert.equal(published.content["hero.title"]?.value, "Edited draft");
   assert.equal(snapshots.value?.version, 1);
   assert.equal(snapshots.value?.content["hero.title"]?.value, "Edited draft");
@@ -45,7 +48,7 @@ test("restore and undo replay published versions without deleting the spot", asy
   await seedSpot(store, "demo", "hero.lede", "Lede", limits);
   await publishSite(store, snapshots, "demo", "editor");
 
-  await saveDraft(store, "demo", "hero.title", { type: "text", value: "Two" });
+  await saveDraft(store, "demo", "hero.title", { type: "text", value: "Two" }, "editor@example.com");
   await publishSite(store, snapshots, "demo", "editor");
   await seedSpot(store, "demo", "footer.line", "Later", limits);
 
@@ -96,10 +99,24 @@ test("only text content is accepted", () => {
   });
 });
 
+test("the code seed shows only when nothing has been stored", () => {
+  assert.equal(displayedText({ seed: "  Rooms  ", source: "seed", published: undefined }), "Rooms");
+  assert.equal(
+    displayedText({ seed: "Rooms", source: "snapshot", published: "From snapshot" }),
+    "From snapshot",
+  );
+  assert.equal(displayedText({ seed: "Rooms", source: "snapshot", published: undefined }), "");
+  assert.equal(
+    displayedText({ seed: "Rooms", source: "database", published: "From the database" }),
+    "From the database",
+  );
+  assert.equal(displayedText({ seed: "Rooms", source: "database", published: "" }), "");
+});
+
 test("unknown spots cannot be saved", async () => {
   const store = new MemoryContentStore();
   await assert.rejects(
-    () => saveDraft(store, "demo", "hero.title", { type: "text", value: "Nope" }),
+    () => saveDraft(store, "demo", "hero.title", { type: "text", value: "Nope" }, "preview"),
     /No editable spot/,
   );
 });

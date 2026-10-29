@@ -2,10 +2,11 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +15,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
+      - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
-      - run: npm run build -w @thereactnativerewind/site-editor
-      - run: npm run build -w site-editor-demo
+      - run: npm run build

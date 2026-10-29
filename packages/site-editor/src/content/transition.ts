@@ -6,7 +6,7 @@ export function promoteDrafts(spots: SpotRecord[]): { spots: SpotRecord[]; conte
   const next = spots.map((spot) => {
     const draft = { type: "text" as const, value: spot.draft.value };
     content[spot.spotId] = draft;
-    return { spotId: spot.spotId, draft, published: draft };
+    return { spotId: spot.spotId, draft, published: draft, updatedBy: spot.updatedBy };
   });
   return { spots: next, content };
 }
@@ -24,18 +24,19 @@ export function applyVersionContent(spots: SpotRecord[], content: ContentMap): S
     if (value) {
       remaining.delete(spot.spotId);
       const copy = { type: "text" as const, value: value.value };
-      next.push({ spotId: spot.spotId, draft: copy, published: copy });
+      next.push({ spotId: spot.spotId, draft: copy, published: copy, updatedBy: spot.updatedBy });
     } else {
       next.push({
         spotId: spot.spotId,
         draft: { type: "text", value: "" },
         published: null,
+        updatedBy: spot.updatedBy,
       });
     }
   }
   for (const [spotId, value] of remaining) {
     const copy = { type: "text" as const, value: value.value };
-    next.push({ spotId, draft: copy, published: copy });
+    next.push({ spotId, draft: copy, published: copy, updatedBy: null });
   }
   return next;
 }

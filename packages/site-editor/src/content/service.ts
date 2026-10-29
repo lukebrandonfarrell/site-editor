@@ -32,6 +32,7 @@ export async function seedSpot(
     spotId,
     draft: content,
     published: content,
+    updatedBy: null,
   });
   if (!inserted) {
     const again = await store.getSpot(siteId, spotId);
@@ -45,9 +46,10 @@ export async function saveDraft(
   siteId: string,
   spotId: string,
   content: TextContent,
+  actor: string,
 ): Promise<void> {
   assertSpotId(spotId);
-  const updated = await store.updateDraft(siteId, spotId, content);
+  const updated = await store.updateDraft(siteId, spotId, content, actor);
   if (!updated) {
     throw new ContentError(
       "spot_not_found",

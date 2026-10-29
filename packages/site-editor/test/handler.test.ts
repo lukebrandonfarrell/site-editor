@@ -160,6 +160,67 @@ test("oversized text, image payloads, and repeated logins are rejected", async (
   assert.equal(blocked.status, 429);
 });
 
+test("preview and signed-in actors are stored on drafts and versions", async () => {
+  const preview = testDeps();
+  await seedSpot(preview.content, "demo", "hero.title", "Initial text", { maxTextLength: 80, maxSpots: 20 });
+  const open = handlerFor(preview);
+  const saved = await open(
+    editorRequest("/api/site-editor/drafts", {
+      method: "PUT",
+      body: JSON.stringify({ id: "hero.title", content: { type: "text", value: "Preview copy" } }),
+    }),
+  );
+  assert.equal(saved.status, 200);
+  assert.equal(((await saved.json()) as { actor: string }).actor, "preview");
+  assert.equal((await preview.content.getSpot("demo", "hero.title"))?.updatedBy, "preview");
+  assert.equal((await open(editorRequest("/api/site-editor/publish", { method: "POST", body: "{}" }))).status, 200);
+  const previewHistory = (await (await open(editorRequest("/api/site-editor/versions"))).json()) as {
+    versions: Array<{ actor: string | null }>;
+  };
+  assert.equal(previewHistory.versions[0]?.actor, "preview");
+
+  const email = new MemoryEmailSender();
+  const signedIn = testDeps({
+    email,
+    config: testConfig({ openEditing: false, allowedEmails: "client@example.com" }),
+  });
+  await seedSpot(signedIn.content, "demo", "hero.title", "Initial text", { maxTextLength: 80, maxSpots: 20 });
+  const locked = handlerFor(signedIn);
+  assert.equal(
+    (
+      await locked(
+        editorRequest("/api/site-editor/auth/request", {
+          method: "POST",
+          body: JSON.stringify({ email: "client@example.com" }),
+        }),
+      )
+    ).status,
+    200,
+  );
+  const token = new URL(email.sent[0]!.url).searchParams.get("token");
+  const callback = await locked(new Request(`http://localhost/api/site-editor/auth/callback?token=${token}`));
+  const cookie = (callback.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+  await locked(
+    editorRequest("/api/site-editor/drafts", {
+      method: "PUT",
+      headers: { cookie },
+      body: JSON.stringify({ id: "hero.title", content: { type: "text", value: "Client copy" } }),
+    }),
+  );
+  assert.equal((await signedIn.content.getSpot("demo", "hero.title"))?.updatedBy, "client@example.com");
+  await locked(
+    editorRequest("/api/site-editor/publish", {
+      method: "POST",
+      headers: { cookie },
+      body: "{}",
+    }),
+  );
+  const signedHistory = (await (
+    await locked(editorRequest("/api/site-editor/versions", { headers: { cookie } }))
+  ).json()) as { versions: Array<{ actor: string | null }> };
+  assert.equal(signedHistory.versions[0]?.actor, "client@example.com");
+});
+
 test("restore returns the site to an older published version", async () => {
   const deps = testDeps();
   const handle = handlerFor(deps);

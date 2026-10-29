@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -20,14 +20,13 @@ test(
       connectionTimeoutMillis: 2000,
     });
     const siteId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const sql = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "../migrations/001_init.sql"),
-      "utf8",
-    );
+    const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "../migrations");
     const store = new PostgresContentStore(pool);
     const snapshots = new MemorySnapshotStore();
     try {
-      await pool.query(sql);
+      for (const file of readdirSync(migrationsDir).filter((name) => name.endsWith(".sql")).sort()) {
+        await pool.query(readFileSync(join(migrationsDir, file), "utf8"));
+      }
       const seeded = await seedSpot(store, siteId, "hero.title", "Initial text", {
         maxTextLength: 200,
         maxSpots: 20,
@@ -39,15 +38,17 @@ test(
       assert.equal(seeded.value, "Initial text");
       assert.equal(ignored.value, "Initial text");
 
-      await saveDraft(store, siteId, "hero.title", { type: "text", value: "Published copy" });
+      await saveDraft(store, siteId, "hero.title", { type: "text", value: "Published copy" }, "client@example.com");
+      assert.equal((await store.getSpot(siteId, "hero.title"))?.updatedBy, "client@example.com");
       const before = await readPublishedOrSnapshot(store, snapshots, siteId);
       assert.equal(before.content["hero.title"]?.value, "Initial text");
 
       const published = await publishSite(store, snapshots, siteId, "client@example.com");
       assert.equal(published.version, 1);
+      assert.equal((await store.listVersions(siteId, 1))[0]?.actor, "client@example.com");
       assert.equal(snapshots.value?.content["hero.title"]?.value, "Published copy");
 
-      await saveDraft(store, siteId, "hero.title", { type: "text", value: "Second" });
+      await saveDraft(store, siteId, "hero.title", { type: "text", value: "Second" }, "client@example.com");
       await publishSite(store, snapshots, siteId, "client@example.com");
       const restored = await restoreSite(store, snapshots, siteId, 1, "client@example.com");
       assert.equal(restored.version, 3);

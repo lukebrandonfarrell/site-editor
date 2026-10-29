@@ -66,12 +66,18 @@ function asText(value: unknown): TextContent | null {
   return { type: "text", value: value.value };
 }
 
-function spotFromRow(row: { spot_id: string; draft: unknown; published: unknown }): SpotRecord {
+function spotFromRow(row: {
+  spot_id: string;
+  draft: unknown;
+  published: unknown;
+  updated_by?: string | null;
+}): SpotRecord {
   const draft = asText(row.draft) ?? { type: "text", value: "" };
   return {
     spotId: row.spot_id,
     draft,
     published: asText(row.published),
+    updatedBy: row.updated_by ?? null,
   };
 }
 
@@ -107,9 +113,14 @@ async function lockSite(client: Queryable, siteId: string): Promise<void> {
 }
 
 async function selectSpots(client: Queryable, siteId: string): Promise<SpotRecord[]> {
-  const result = await query<{ spot_id: string; draft: unknown; published: unknown }>(
+  const result = await query<{
+    spot_id: string;
+    draft: unknown;
+    published: unknown;
+    updated_by: string | null;
+  }>(
     client,
-    `SELECT spot_id, draft, published FROM site_editor_spots WHERE site_id = $1 ORDER BY spot_id FOR UPDATE`,
+    `SELECT spot_id, draft, published, updated_by FROM site_editor_spots WHERE site_id = $1 ORDER BY spot_id FOR UPDATE`,
     [siteId],
   );
   return result.rows.map(spotFromRow);
@@ -129,17 +140,19 @@ async function writeSpots(client: Queryable, siteId: string, spots: SpotRecord[]
   for (const spot of spots) {
     await query(
       client,
-      `INSERT INTO site_editor_spots (site_id, spot_id, draft, published)
-       VALUES ($1, $2, $3::jsonb, $4::jsonb)
+      `INSERT INTO site_editor_spots (site_id, spot_id, draft, published, updated_by)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
        ON CONFLICT (site_id, spot_id) DO UPDATE
        SET draft = EXCLUDED.draft,
            published = EXCLUDED.published,
+           updated_by = EXCLUDED.updated_by,
            updated_at = now()`,
       [
         siteId,
         spot.spotId,
         JSON.stringify(spot.draft),
         spot.published ? JSON.stringify(spot.published) : null,
+        spot.updatedBy,
       ],
     );
   }
@@ -177,9 +190,14 @@ export class PostgresContentStore implements ContentStore {
   constructor(private readonly pool: pg.Pool) {}
 
   async getSpot(siteId: string, spotId: string): Promise<SpotRecord | null> {
-    const result = await query<{ spot_id: string; draft: unknown; published: unknown }>(
+    const result = await query<{
+      spot_id: string;
+      draft: unknown;
+      published: unknown;
+      updated_by: string | null;
+    }>(
       this.pool,
-      `SELECT spot_id, draft, published FROM site_editor_spots WHERE site_id = $1 AND spot_id = $2`,
+      `SELECT spot_id, draft, published, updated_by FROM site_editor_spots WHERE site_id = $1 AND spot_id = $2`,
       [siteId, spotId],
     );
     const row = result.rows[0];
@@ -193,8 +211,8 @@ export class PostgresContentStore implements ContentStore {
       ]);
       const result = await query(
         client,
-        `INSERT INTO site_editor_spots (site_id, spot_id, draft, published)
-         VALUES ($1, $2, $3::jsonb, $4::jsonb)
+        `INSERT INTO site_editor_spots (site_id, spot_id, draft, published, updated_by)
+         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
          ON CONFLICT (site_id, spot_id) DO NOTHING
          RETURNING spot_id`,
         [
@@ -202,27 +220,34 @@ export class PostgresContentStore implements ContentStore {
           spot.spotId,
           JSON.stringify(spot.draft),
           spot.published ? JSON.stringify(spot.published) : null,
+          spot.updatedBy,
         ],
       );
       return result.rowCount === 1;
     });
   }
 
-  async updateDraft(siteId: string, spotId: string, draft: TextContent): Promise<boolean> {
+  async updateDraft(siteId: string, spotId: string, draft: TextContent, actor: string): Promise<boolean> {
     const result = await query(
       this.pool,
-      `UPDATE site_editor_spots SET draft = $3::jsonb, updated_at = now()
+      `UPDATE site_editor_spots
+       SET draft = $3::jsonb, updated_by = $4, updated_at = now()
        WHERE site_id = $1 AND spot_id = $2
        RETURNING spot_id`,
-      [siteId, spotId, JSON.stringify(draft)],
+      [siteId, spotId, JSON.stringify(draft), actor],
     );
     return result.rowCount === 1;
   }
 
   async listSpots(siteId: string): Promise<SpotRecord[]> {
-    const result = await query<{ spot_id: string; draft: unknown; published: unknown }>(
+    const result = await query<{
+      spot_id: string;
+      draft: unknown;
+      published: unknown;
+      updated_by: string | null;
+    }>(
       this.pool,
-      `SELECT spot_id, draft, published FROM site_editor_spots WHERE site_id = $1 ORDER BY spot_id`,
+      `SELECT spot_id, draft, published, updated_by FROM site_editor_spots WHERE site_id = $1 ORDER BY spot_id`,
       [siteId],
     );
     return result.rows.map(spotFromRow);
@@ -265,7 +290,7 @@ export class PostgresContentStore implements ContentStore {
     return {
       version: Number(row.version),
       content: sanitizeContentMap(row.content),
-      createdBy: row.created_by,
+      actor: row.created_by,
       restoredFrom: row.restored_from === null ? null : Number(row.restored_from),
       createdAt: row.created_at.toISOString(),
     };
@@ -289,7 +314,7 @@ export class PostgresContentStore implements ContentStore {
     return result.rows.map((row) => ({
       version: Number(row.version),
       createdAt: row.created_at.toISOString(),
-      createdBy: row.created_by,
+      actor: row.created_by,
       restoredFrom: row.restored_from === null ? null : Number(row.restored_from),
     }));
   }

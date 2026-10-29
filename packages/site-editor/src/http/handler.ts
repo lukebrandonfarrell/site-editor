@@ -187,7 +187,7 @@ export function createSiteEditorHandler(deps: SiteEditorHandlerDeps) {
       throw new HttpError(400, "invalid_content", "A spot id is required.");
     }
     const content = parseTextContent(body.content, deps.config.maxTextLength);
-    await saveDraft(deps.content, deps.config.siteId, body.id, content);
+    await saveDraft(deps.content, deps.config.siteId, body.id, content, editor.actor);
     return json({ ok: true, id: body.id, actor: editor.actor });
   }
 
@@ -200,7 +200,12 @@ export function createSiteEditorHandler(deps: SiteEditorHandlerDeps) {
     );
     const result = await publishSite(deps.content, deps.snapshots, deps.config.siteId, editor.actor);
     await revalidate();
-    return json({ ok: true, version: result.version, publishedAt: result.createdAt });
+    return json({
+      ok: true,
+      version: result.version,
+      publishedAt: result.createdAt,
+      actor: editor.actor,
+    });
   }
 
   async function getVersions(req: Request): Promise<Response> {

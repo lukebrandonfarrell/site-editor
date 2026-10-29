@@ -9,10 +9,16 @@
   "keywords": [
     "nextjs",
     "visual-editor",
+    "inline-editing",
     "cms",
     "vercel",
-    "react"
+    "react",
+    "postgres",
+    "site-editor"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lukebrandonfarrell/site-editor.git",

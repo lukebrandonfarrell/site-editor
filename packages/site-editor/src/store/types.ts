@@ -3,7 +3,7 @@ import type { PublishResult, SpotRecord, TextContent, VersionRecord, VersionSumm
 export interface ContentStore {
   getSpot(siteId: string, spotId: string): Promise<SpotRecord | null>;
   insertSpot(siteId: string, spot: SpotRecord): Promise<boolean>;
-  updateDraft(siteId: string, spotId: string, draft: TextContent): Promise<boolean>;
+  updateDraft(siteId: string, spotId: string, draft: TextContent, actor: string): Promise<boolean>;
   listSpots(siteId: string): Promise<SpotRecord[]>;
   countSpots(siteId: string): Promise<number>;
   publish(siteId: string, actor: string | null): Promise<PublishResult>;

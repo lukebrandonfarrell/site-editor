@@ -1,51 +1,72 @@
 # Site Editor
 
-Site Editor is an open-source, plug-in visual editor for Next.js sites hosted on Vercel. Non-technical clients point at copy, change it, and publish. The live page updates within a second or two. There is no pull request, no agent, and no rebuild in the loop.
+[![CI](https://github.com/lukebrandonfarrell/site-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/lukebrandonfarrell/site-editor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Clients can only change spots a developer marked. Everything else on the page stays in code.
+![Editing a headline and publishing it live](docs/demo.gif)
+
+**Clients edit the words on a live Next.js site. Publish shows up in a second or two, with no pull request and no rebuild.**
+
+Site Editor is an open-source plug-in from [The React Native Rewind](https://github.com/lukebrandonfarrell/site-editor). Developers mark the spots that can change. Clients point, type, and publish. Everyone else still sees the site as a normal page.
 
 ```tsx
 <Editable id="hero.title">Rooms that hold the light.</Editable>
 ```
 
-The string in code is a **seed**. The first time that spot is rendered it is stored in Postgres. After that the database is the only source of truth — editing the string in the repo does not change the live site. Each publish also writes a snapshot of the published content, and that snapshot is what the site serves if Postgres is unreachable.
+## Features
 
-Version 1 stores text only, in a shape that can grow later:
+- Inline editing of marked copy only. Unmarked markup stays in code.
+- Drafts stay off the public page until **Publish**.
+- Version history, undo, and restore. Restoring writes a new version, so nothing is erased.
+- Postgres is the source of truth (`DATABASE_URL`). Neon and Supabase both work.
+- Each publish writes a snapshot. If Postgres is down, that snapshot is what visitors see.
+- If there is no database and no snapshot yet, the page renders the seed text from code instead of blank spots.
+- Preview deployments (`VERCEL_ENV=preview`) and local dev open the editor with no login. Production requires a magic link to an allowlisted email.
+- Resend sends the link. With no API key, the link is printed in the server log.
+- Text length, body size, and request rate limits are on by default.
 
-```ts
-{ type: "text", value: "Rooms that hold the light." }
+## How it works
+
+```mermaid
+flowchart TD
+  code["Editable seed in code"] --> first["First render creates the spot"]
+  first --> db[("Postgres")]
+  editor["Edit button"] --> draft["Save draft"]
+  draft --> db
+  publish["Publish"] --> db
+  publish --> snap["Snapshot file or Vercel Blob"]
+  publish --> cache["revalidateTag + revalidatePath"]
+  cache --> page["Live page, about a second later"]
+  db --> page
+  db -.->|unreachable| snap
+  snap -.->|no snapshot yet| code
 ```
 
-## How publishing works
+The string inside `<Editable>` is a seed. The first time that spot renders against a database, the seed is copied into Postgres. After that, edits in the repo do not change the live words. Publish copies every draft onto the published value, stores a numbered version with the actor (`preview` or the client’s email), writes the snapshot, and tells Next.js to drop the cached page.
 
-1. A client edits a spot. The change is saved as a **draft** and is not what visitors see.
-2. **Publish** copies every draft onto the published value, stores a numbered version, and writes a snapshot.
-3. The API route calls `revalidateTag("site-editor")` and `revalidatePath` (default `/`). Vercel drops the cached page, the next request reads the new published text, and the live site updates within a second or two.
-4. **History** lists published versions. **Restore** makes an older version live again by writing a new version (it does not erase history). **Undo** restores the previous published version the same way.
+## Five-minute quickstart
 
-Spots that did not exist in the restored version stay in the database with an empty published value, so the original seed in code cannot silently come back.
+A Next.js App Router app on Vercel. Node 20 or newer.
 
-## Repository layout
-
-```
-apps/demo                         Next.js marketing page that uses the editor
-packages/site-editor              publishable package @thereactnativerewind/site-editor
-  src/                            editor UI, content rules, Postgres store, HTTP API
-  migrations/001_init.sql         idempotent schema
-  test/                           versioning, auth, rate limits, snapshot fallback
-```
-
-The package is set up to publish to npm. This repo does not publish it for you.
-
-## Install into a Next.js app
-
-Peer dependencies are `next`, `react`, and `react-dom`. `pg` and `resend` are dependencies of the package.
+**1. Install**
 
 ```bash
 npm install @thereactnativerewind/site-editor
 ```
 
-Wrap the app in the provider and the frame. The frame reads published content on the server. The provider is the floating editor.
+In this repository the package is the workspace `packages/site-editor`. It is ready to publish and is not published from CI.
+
+**2. Mount the API route**
+
+```ts
+// app/api/site-editor/[...path]/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export { DELETE, GET, POST, PUT } from "@thereactnativerewind/site-editor/route";
+```
+
+**3. Wrap the app and mark spots**
 
 ```tsx
 // app/layout.tsx
@@ -65,19 +86,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-Mount the API route exactly once:
-
-```ts
-// app/api/site-editor/[...path]/route.ts
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-export { GET, POST, PUT, DELETE } from "@thereactnativerewind/site-editor/route";
-```
-
-Mark copy. The child must be a plain string — that string is the seed, not a fallback.
-
 ```tsx
+// app/page.tsx
 import { Editable } from "@thereactnativerewind/site-editor/server";
 
 export default function Page() {
@@ -89,16 +99,32 @@ export default function Page() {
 }
 ```
 
-Spot ids are 1–128 characters: letters, numbers, `.`, `_`, `:`, and `-`.
+The child of `<Editable>` must be a plain string. That string is the seed.
 
-Apply the schema once per database:
+**4. Set environment variables** on the Vercel project, for Production, Preview, and the build:
 
 ```bash
-export DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB
-npx site-editor migrate
+DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB
+SITE_EDITOR_ALLOWED_EMAILS=client@example.com
+RESEND_API_KEY=re_xxxxxxxxx
+SITE_EDITOR_FROM_EMAIL="Site Editor <editor@yourdomain.com>"
 ```
 
-In this monorepo, from the repository root:
+Provision Postgres from the Vercel Marketplace (Neon or Supabase). Both speak `DATABASE_URL`.
+
+**5. Migrate, then deploy**
+
+```bash
+DATABASE_URL="postgres://..." npx site-editor migrate
+```
+
+In this repo: `npm install && npm run migrate`. The SQL is safe to run again.
+
+Open a preview deployment and use the **Edit** button. On production, clients open `/?site-editor=login`.
+
+The demo in `apps/demo` is this setup already. See `apps/demo/vercel.json` for the monorepo install and build commands. Set the Vercel root directory to `apps/demo` and include source files outside that directory.
+
+Try it locally:
 
 ```bash
 docker compose up -d
@@ -108,115 +134,90 @@ npm run migrate
 npm run dev
 ```
 
-`npm run migrate` builds the package, then runs `migrations/001_init.sql`. The SQL is safe to run again. If `apps/demo/.env` or `./.env` defines `DATABASE_URL`, the migrate command picks it up.
+Open http://localhost:3000.
 
-Run the demo:
+## Configuration
 
-```bash
-npm run dev
-```
-
-Open http://localhost:3000. Local `next dev` shows the **Edit** button with no login. Change a headline, click **Publish**, and reload — the new text is served from Postgres. **History** restores an older published version. Drafts do not appear for visitors until publish.
-
-## Environment variables
-
-Set these on the Vercel project (Production and Preview). `DATABASE_URL` must also be available at **build** time so the first render can seed spots.
-
-| Variable | Required | Purpose |
+| Variable | Required | What it does |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string. Neon or Supabase from the Vercel Marketplace both work. Localhost skips SSL; hosted databases use SSL. |
-| `SITE_EDITOR_ALLOWED_EMAILS` | Production login | Comma-separated client emails allowed to request a magic link. Example: `client@example.com, studio@example.com`. |
-| `RESEND_API_KEY` | Production email | [Resend](https://resend.com) API key. If it is unset, the magic link is printed in the server log instead of emailed. |
+| `DATABASE_URL` | Yes, once you want edits to stick | Postgres connection string. Localhost skips SSL. Hosted databases use SSL. |
+| `SITE_EDITOR_SITE_ID` | No | Defaults to `default`. One database can hold many sites. The demo uses `demo`. |
+| `SITE_EDITOR_ALLOWED_EMAILS` | Production login | Comma-separated client emails. Example: `client@example.com, studio@example.com`. |
+| `RESEND_API_KEY` | To email links | [Resend](https://resend.com) API key. If unset, the magic link is logged. |
 | `SITE_EDITOR_FROM_EMAIL` | With Resend | Verified sender, for example `Site Editor <editor@yourdomain.com>`. |
-| `SITE_EDITOR_SITE_ID` | No | Defaults to `default`. One database can store many sites. The demo uses `demo`. |
-| `SITE_EDITOR_URL` | Custom hosts | Public origin for sign-in links, such as `https://your-domain.com`. On Vercel the request host is trusted. Off Vercel, anything that is not localhost must match this (or `VERCEL_URL` / `VERCEL_PROJECT_PRODUCTION_URL`). |
-| `SITE_EDITOR_OPEN` | No | `1` shows the editor with no login. `0` always requires login. Default: open when `VERCEL_ENV=preview` or when running locally in development; login required when `VERCEL_ENV=production`. |
+| `SITE_EDITOR_URL` | Custom hosts | Public origin for sign-in links, such as `https://example.com`. Vercel hosts and localhost are trusted without it. |
+| `SITE_EDITOR_OPEN` | No | `1` opens the editor with no login. `0` always requires login. Default: open on `VERCEL_ENV=preview` and local development; login required on `VERCEL_ENV=production`. |
 | `SITE_EDITOR_REVALIDATE_PATHS` | No | Comma-separated paths to revalidate on publish. Default `/`. |
-| `SITE_EDITOR_SNAPSHOT_PATH` | No | File or directory for the published snapshot. Default is `.site-editor/<siteId>.json` in the working directory, then the system temp directory if that path is not writable. |
-| `BLOB_READ_WRITE_TOKEN` | Recommended on Vercel | When set, publish also writes the snapshot to Vercel Blob. Blob is shared across serverless instances, so a database outage still has a copy to serve. Without it, Vercel’s read-only filesystem means the file snapshot only lands in `/tmp` on the instance that published. |
-| `SITE_EDITOR_MAX_TEXT_LENGTH` | No | Max characters per spot. Default `8000`. |
-| `VERCEL_ENV` | Set by Vercel | `preview` opens the editor with no login. `production` hides it until a client is signed in. |
+| `SITE_EDITOR_SNAPSHOT_PATH` | No | File or directory for the published snapshot. Default `.site-editor/<siteId>.json`, then the temp directory if that path is read-only. |
+| `BLOB_READ_WRITE_TOKEN` | Recommended on Vercel | Also writes the snapshot to Vercel Blob so a fresh serverless instance can serve it when Postgres is down. |
+| `SITE_EDITOR_MAX_TEXT_LENGTH` | No | Characters per spot. Default `8000`. |
+| `VERCEL_ENV` | Set by Vercel | `preview` opens the editor. `production` hides it until sign-in. |
 
-Vercel also sets `VERCEL`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. Do not invent those.
+`DATABASE_URL` should be available at build time so the first render can seed spots. If it is missing, or the database is unreachable and no snapshot exists, visitors see the seed text from code.
 
-### Demo on Vercel
+## Auth and security
 
-`apps/demo/vercel.json` sets the install and build commands. In the Vercel project:
+- **Preview and local dev.** Anyone with the URL can edit and publish. Do not put secrets in editable copy. Preview URLs are unlisted, not a lock.
+- **Production.** The Edit button is hidden. A client opens `/?site-editor=login`, enters an allowlisted email, and receives a one-time link. The link lasts 15 minutes, works once, and sets an httpOnly session cookie for 7 days.
+- **Allowlist.** `SITE_EDITOR_ALLOWED_EMAILS`. An empty list denies every login. Comparison is case-insensitive.
+- **Email.** Resend when `RESEND_API_KEY` and `SITE_EDITOR_FROM_EMAIL` are both set. Otherwise the link is printed on the server. Resend’s `onboarding@resend.dev` sender only delivers to the Resend account address. Use a verified domain for clients.
+- **Host pinning.** Sign-in links use the Vercel host or localhost. Any other host must match `SITE_EDITOR_URL`, so a forged `Host` header cannot steal the link.
+- **Mutations** must be same-origin and send `x-site-editor: 1`. The editor UI does this. Copy is stored and rendered as text, not HTML.
+- **Limits.** 8,000 characters per spot, 32 KB per request, 200 spots per site. 60 draft saves per minute per IP. 10 publish, restore, or undo actions per 5 minutes per site. 5 magic-link requests per 15 minutes per email, and 30 per 15 minutes per IP.
 
-1. Framework preset: Next.js
-2. Root Directory: `apps/demo`
-3. Include source files outside the root directory (the workspace package lives in `packages/site-editor`)
+Report vulnerabilities through [GitHub security advisories](https://github.com/lukebrandonfarrell/site-editor/security/advisories). See [SECURITY.md](SECURITY.md).
 
-The commands in `vercel.json` install from the repository root, build the editor package, then run `next build` in `apps/demo`.
+## Data model
 
-Set these environment variables for Production and Preview, and make `DATABASE_URL` available to the **build** as well as runtime:
+Every spot stores a tagged value. Version 1 accepts text only:
 
-- `DATABASE_URL` (required)
-- `SITE_EDITOR_SITE_ID=demo`
-- `SITE_EDITOR_ALLOWED_EMAILS`, `RESEND_API_KEY`, and `SITE_EDITOR_FROM_EMAIL` for production sign-in
-- `BLOB_READ_WRITE_TOKEN` so the published snapshot survives a database outage on a fresh serverless instance
-
-After the database exists, apply the schema once from any machine that can reach it:
-
-```bash
-DATABASE_URL="postgres://..." npm run migrate
+```ts
+{ type: "text", value: "Rooms that hold the light." }
 ```
 
-## Auth
+Versions are a map of those values plus an `actor` (`preview` or the session email) and an optional `restoredFrom` version number. Draft rows remember `updated_by` the same way.
 
-- **Preview** (`VERCEL_ENV=preview`) and **local dev**: the Edit button is on the page. Anyone with the preview URL can change drafts and publish. Do not put secrets in editable copy.
-- **Production**: the button is hidden. The client opens `/?site-editor=login`, enters an allowlisted email, and gets a one-time link (15 minutes). The link sets an httpOnly session cookie for 7 days. After that, the Edit button is available.
-- The sender is pluggable (`EmailSender`). Resend is the default when `RESEND_API_KEY` and `SITE_EDITOR_FROM_EMAIL` are both set. Otherwise the link is logged. Resend’s `onboarding@resend.dev` sender only delivers to the address on the Resend account — use a verified domain for real clients.
+The tag is there so later types do not need a new table:
 
-Sign-in links use the Vercel host or localhost. Other hosts need `SITE_EDITOR_URL`, so a forged `Host` header cannot redirect the magic link.
+- **Images.** `{ type: "image", src: string, alt: string }`
+- **Spacing.** `{ type: "spacing", padding: BoxEdges, margin: BoxEdges }`
 
-## Limits
+Unknown types are rejected on write.
 
-Defaults, overridable with the env vars above:
+## FAQ
 
-- 8,000 characters per text spot, 32 KB per request body, 200 spots per site
-- 60 draft saves per minute per IP
-- 10 publish/restore/undo actions per 5 minutes per site
-- 5 magic-link requests per 15 minutes per email, 30 per 15 minutes per IP
+**Does changing the string in code update the live site?**
+Only the first time that spot is created, and only when a database is configured. After that, Postgres wins. Change the words in the editor, or delete the row if you truly want the seed copied again.
 
-Mutations must come from the same origin and send `x-site-editor: 1`. The editor UI does this. Text is stored and rendered as text, not HTML.
+**What do visitors see if Postgres is down?**
+The last published snapshot. If no snapshot has been written yet, they see the seed text from code, not an empty page.
 
-## Snapshot when Postgres is down
+**Why didn’t my draft show up on the live site?**
+Drafts are private to the editor. Publish promotes them, writes a version, and revalidates the Next.js cache.
 
-Publish writes, in order:
+**Who is “preview” in the history?**
+An edit made on a preview deployment or in local dev, where the editor is open without a login. Production history shows the allowlisted email.
 
-1. The version and published spots in Postgres (source of truth).
-2. A JSON file (`.site-editor/<siteId>.json`, or `SITE_EDITOR_SNAPSHOT_PATH`, or the temp directory if the disk is read-only).
-3. A private Vercel Blob at `site-editor/<siteId>/snapshot.json` when `BLOB_READ_WRITE_TOKEN` is set.
-
-Reads try Postgres first, through Next.js `unstable_cache` tagged `site-editor`. If the connection fails, the render serves the snapshot file or Blob and does **not** show the seed string from code. The page is not frozen as an empty static shell in that case.
-
-On Vercel without Blob, `/tmp` is per instance and ephemeral. Use Blob if a database outage must still show the last published copy on a fresh instance. While the data cache is warm, Vercel can also keep serving the last successful render until the tag is revalidated.
-
-## Tests
-
-```bash
-npm test
-```
-
-Core coverage: seed-once, draft vs published, publish snapshots, restore, undo, text-only validation, magic-link allowlist, rate limits, and snapshot fallback.
-
-Against a real Postgres (Docker Compose in this repo):
-
-```bash
-docker compose up -d
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/site_editor
-npm run test:postgres
-```
+**Can I run two sites on one database?**
+Yes. Set a different `SITE_EDITOR_SITE_ID` for each app.
 
 ## Roadmap
 
-V1 is text only. The stored JSON is a tagged object so later types can land without a migration of the table shape:
+- Image spots, chosen from an upload or a URL, with alt text.
+- Spacing spots so clients can nudge padding and margin without editing CSS.
+- Richer text (links and a few marks) where a spot needs it. Plain text stays the default so published copy cannot inject HTML.
 
-- **Image** — `{ type: "image", src: string, alt: string }`, chosen from an upload or URL, rendered in place of a text spot.
-- **Spacing** — `{ type: "spacing", padding: { top, right, bottom, left }, margin: { top, right, bottom, left } }` so clients can nudge layout without editing CSS.
-- Richer text (marks, links) if a spot needs it. Plain text stays the default so published copy cannot inject HTML.
+## Development
 
-## License
+```bash
+npm install
+npm test
+npm run typecheck
+npm run build
+```
 
-[MIT](./LICENSE)
+`npm run test:postgres` needs `DATABASE_URL`. Docker Compose in this repo starts Postgres on port 5432.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for pull requests. The license is [MIT](LICENSE).
+
+Screenshots of the demo: [the Edit button](docs/edit-button.png), [inline editing](docs/inline-edit.png), [the publish toolbar](docs/toolbar-publish.png), and [version history](docs/version-history.png).

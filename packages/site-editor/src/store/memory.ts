@@ -19,6 +19,7 @@ function cloneSpot(spot: SpotRecord): SpotRecord {
     spotId: spot.spotId,
     draft: cloneContent(spot.draft),
     published: spot.published ? cloneContent(spot.published) : null,
+    updatedBy: spot.updatedBy,
   };
 }
 
@@ -46,10 +47,11 @@ export class MemoryContentStore implements ContentStore {
     return true;
   }
 
-  async updateDraft(siteId: string, spotId: string, draft: TextContent): Promise<boolean> {
+  async updateDraft(siteId: string, spotId: string, draft: TextContent, actor: string): Promise<boolean> {
     const spot = this.site(siteId).spots.get(spotId);
     if (!spot) return false;
     spot.draft = cloneContent(draft);
+    spot.updatedBy = actor;
     return true;
   }
 
@@ -81,10 +83,10 @@ export class MemoryContentStore implements ContentStore {
     return [...this.site(siteId).versions]
       .sort((a, b) => b.version - a.version)
       .slice(0, limit)
-      .map(({ version, createdAt, createdBy, restoredFrom }) => ({
+      .map(({ version, createdAt, actor, restoredFrom }) => ({
         version,
         createdAt,
-        createdBy,
+        actor,
         restoredFrom,
       }));
   }
@@ -111,7 +113,7 @@ export class MemoryContentStore implements ContentStore {
       version,
       content,
       createdAt: new Date().toISOString(),
-      createdBy: actor,
+      actor,
       restoredFrom,
     };
     data.versions.push(record);
