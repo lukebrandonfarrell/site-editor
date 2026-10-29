@@ -1,4 +1,4 @@
-import { applyEditableCacheHeaders } from "@thereactnativerewind/site-editor/astro";
+import { applyEditableCacheHeaders } from "@thereactnativerewind/inplace/astro";
 import { defineMiddleware } from "astro:middleware";
 
 export const onRequest = defineMiddleware(async (context, next) => {

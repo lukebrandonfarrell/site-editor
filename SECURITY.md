@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-Security fixes land on `main` and ship in the next release of `@thereactnativerewind/site-editor`. The package is not yet published to npm. Treat the `main` branch as the supported line.
+Security fixes land on `main` and ship in the next release of `@thereactnativerewind/inplace`. The package is not yet published to npm. Treat the `main` branch as the supported line.
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately through [GitHub security advisories](https://github.com/lukebrandonfarrell/site-editor/security/advisories) for this repository. Do not open a public issue for an unfixed vulnerability.
+Please report vulnerabilities privately through [GitHub security advisories](https://github.com/the-react-native-rewind/inplace/security/advisories) for this repository. Do not open a public issue for an unfixed vulnerability.
 
 Include what you can:
 
@@ -19,6 +19,6 @@ We will acknowledge the report, work on a fix, and credit you if you want to be 
 
 ## What this editor trusts
 
-Preview deployments and local development can edit without a login. That is intentional. Production editing requires a magic link to an address in `SITE_EDITOR_ALLOWED_EMAILS`. Do not put secrets, tokens, or private customer data in editable copy.
+Preview deployments and local development can edit without a login. That is intentional. Production editing requires a magic link to an address in `INPLACE_ALLOWED_EMAILS`. Do not put secrets, tokens, or private customer data in editable copy.
 
-Sign-in links are single-use and short-lived. Session cookies are httpOnly. Mutations require a same-origin request and the `x-site-editor` header.
+Sign-in links are single-use and short-lived. Session cookies are httpOnly. Mutations require a same-origin request and the `x-inplace` header.

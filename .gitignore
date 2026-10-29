@@ -81,8 +81,8 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
-!packages/site-editor/dist/
-!packages/site-editor/dist/**
+!packages/inplace/dist/
+!packages/inplace/dist/**
 .output
 
 # Gatsby files
@@ -153,3 +153,4 @@ vite.config.ts.timestamp-*
 
 # Published-content snapshots written when the database is the source of truth
 .site-editor/
+.inplace/

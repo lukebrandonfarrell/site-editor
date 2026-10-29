@@ -1,0 +1,47 @@
+---
+import "@thereactnativerewind/inplace/styles.css";
+import {
+  isOpenEditing,
+  loadPublishedState,
+  resolveEditableText,
+  type PublishedState,
+} from "@thereactnativerewind/inplace/astro";
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const rendered = await Astro.slots.render("default");
+const seed = rendered
+  .replace(/<[^>]*>/g, "")
+  .replace(/&amp;/g, "&")
+  .replace(/&lt;/g, "<")
+  .replace(/&gt;/g, ">")
+  .replace(/&quot;/g, '"')
+  .trim();
+const locals = Astro.locals as { siteEditor?: boolean; siteEditorState?: PublishedState };
+let value = seed;
+let open = false;
+try {
+  if (!locals.siteEditorState) locals.siteEditorState = await loadPublishedState();
+  value = await resolveEditableText(id, seed, locals.siteEditorState);
+  open = isOpenEditing();
+  locals.siteEditor = true;
+} catch (error) {
+  console.warn(
+    `[inplace] Spot "${id}" fell back to its seed.`,
+    error instanceof Error ? error.message : error,
+  );
+}
+---
+
+<span data-inplace-spot={id}>{value}</span>
+<meta name="inplace-open" content={open ? "true" : "false"} />
+<meta name="inplace-styles" content="external" />
+
+<script>
+  import { mountInplace } from "@thereactnativerewind/inplace/astro/editor";
+
+  mountInplace({ injectStyles: false });
+</script>

@@ -1,20 +1,20 @@
 {
-  "name": "site-editor",
+  "name": "inplace",
   "private": true,
-  "description": "Monorepo for the Site Editor visual copy editor and its demo site.",
+  "description": "Monorepo for the Inplace visual copy editor and its demo site.",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @thereactnativerewind/site-editor && npm run build -w site-editor-demo && npm run build -w site-editor-demo-astro",
-    "test": "npm run test -w @thereactnativerewind/site-editor",
-    "test:postgres": "npm run test:postgres -w @thereactnativerewind/site-editor",
+    "build": "npm run build -w @thereactnativerewind/inplace && npm run build -w inplace-demo && npm run build -w inplace-demo-astro",
+    "test": "npm run test -w @thereactnativerewind/inplace",
+    "test:postgres": "npm run test:postgres -w @thereactnativerewind/inplace",
     "lint": "eslint .",
-    "typecheck": "npm run typecheck -w @thereactnativerewind/site-editor && npm run build -w @thereactnativerewind/site-editor && npm run typecheck -w site-editor-demo",
-    "migrate": "npm run build -w @thereactnativerewind/site-editor && npm run migrate -w @thereactnativerewind/site-editor",
-    "dev": "npm run build -w @thereactnativerewind/site-editor && npm run dev -w site-editor-demo",
-    "start": "npm run start -w site-editor-demo"
+    "typecheck": "npm run typecheck -w @thereactnativerewind/inplace && npm run build -w @thereactnativerewind/inplace && npm run typecheck -w inplace-demo",
+    "migrate": "npm run build -w @thereactnativerewind/inplace && npm run migrate -w @thereactnativerewind/inplace",
+    "dev": "npm run build -w @thereactnativerewind/inplace && npm run dev -w inplace-demo",
+    "start": "npm run start -w inplace-demo"
   },
   "engines": {
     "node": ">=20"

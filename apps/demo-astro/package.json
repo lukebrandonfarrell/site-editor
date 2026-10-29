@@ -1,5 +1,5 @@
 {
-  "name": "site-editor-demo-astro",
+  "name": "inplace-demo-astro",
   "private": true,
   "version": "0.2.0",
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@astrojs/vercel": "9.0.5",
-    "@thereactnativerewind/site-editor": "0.2.2",
+    "@thereactnativerewind/inplace": "0.3.0",
     "astro": "5.18.2"
   }
 }

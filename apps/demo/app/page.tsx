@@ -1,4 +1,4 @@
-import { Editable } from "@thereactnativerewind/site-editor/server";
+import { Editable } from "@thereactnativerewind/inplace/server";
 
 export default function HomePage() {
   return (
@@ -89,7 +89,7 @@ export default function HomePage() {
         </span>
         <p className="hint">
           On a preview deployment the words are editable straight away. On production, visit{" "}
-          <code>/?site-editor=login</code> and sign in with an allowlisted email. Drafts stay off the
+          <code>/?inplace=login</code> and sign in with an allowlisted email. Drafts stay off the
           live page until you publish.
         </p>
       </footer>

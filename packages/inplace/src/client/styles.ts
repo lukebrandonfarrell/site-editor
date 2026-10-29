@@ -1,0 +1,160 @@
+export const editorStyles = `
+.inplace-launch,
+.inplace-bar,
+.inplace-dialog {
+  font-family: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+.inplace-launch {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: #221c16;
+  color: #f6f1e6;
+  box-shadow: 0 12px 30px rgba(34, 28, 22, 0.22);
+  cursor: pointer;
+}
+.inplace-launch:hover { background: #3a3128; }
+.inplace-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border-radius: 16px;
+  background: #221c16;
+  color: #f6f1e6;
+  box-shadow: 0 18px 50px rgba(34, 28, 22, 0.28);
+}
+.inplace-status {
+  font-size: 13px;
+  color: #d9d0c2;
+  max-width: 28vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inplace-error { color: #ffb4a2; }
+.inplace-bar button,
+.inplace-dialog button {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.inplace-bar button:hover { background: rgba(255, 255, 255, 0.08); }
+.inplace-bar button:disabled { opacity: 0.55; cursor: default; }
+.inplace-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border-radius: 999px !important;
+  flex: none;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+.inplace-overflow { position: relative; flex: none; }
+.inplace-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 148px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #2c261f;
+  box-shadow: 0 12px 30px rgba(34, 28, 22, 0.28);
+}
+.inplace-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+  color: #f6f1e6;
+}
+.inplace-publish {
+  background: #e4ff6a !important;
+  color: #221c16 !important;
+}
+.inplace-publish:hover { background: #efffb0 !important; }
+.inplace-publish-quiet {
+  background: transparent !important;
+  color: #b7ad9f !important;
+}
+.inplace-publish-quiet:hover { background: rgba(255, 255, 255, 0.08) !important; }
+.inplace-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(34, 28, 22, 0.4);
+  padding: 20px;
+}
+.inplace-card {
+  width: min(420px, 100%);
+  background: #f7f1e6;
+  color: #221c16;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(34, 28, 22, 0.25);
+}
+.inplace-card h2 { margin: 0 0 8px; font-size: 22px; }
+.inplace-card p { margin: 0 0 14px; color: #5c5348; }
+.inplace-card input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(34, 28, 22, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  margin-bottom: 12px;
+  background: white;
+}
+.inplace-card .inplace-publish { width: 100%; }
+html[data-inplace-editing="true"] [data-inplace-spot] {
+  outline: 1px dashed rgba(31, 106, 74, 0.7);
+  outline-offset: 4px;
+  border-radius: 4px;
+  cursor: text;
+  min-width: 0.5em;
+}
+html[data-inplace-editing="true"] [data-inplace-spot]:focus {
+  outline: 2px solid #1f6a4a;
+  background: rgba(228, 255, 106, 0.35);
+}
+html[data-inplace-editing="true"] body { padding-bottom: 96px; }
+@media (prefers-reduced-motion: reduce) {
+  .inplace-launch, .inplace-bar { transition: none; }
+}
+/* display:flex/grid on the bar and dialog would otherwise beat the hidden attribute. */
+.inplace-root [hidden] {
+  display: none !important;
+}
+/* Stay invisible until a session or preview is confirmed. Beats display:flex/grid. */
+html:not([data-inplace-chrome="on"]) .inplace-launch,
+html:not([data-inplace-chrome="on"]) .inplace-bar,
+html:not([data-inplace-chrome="on"]) .inplace-dialog,
+html:not([data-inplace-chrome="on"]) .inplace-menu {
+  display: none !important;
+}
+`;

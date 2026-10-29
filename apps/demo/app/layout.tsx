@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Outfit } from "next/font/google";
-import { SiteEditorProvider } from "@thereactnativerewind/site-editor";
-import { SiteEditorFrame, getEditorBootstrap } from "@thereactnativerewind/site-editor/server";
+import { InplaceProvider } from "@thereactnativerewind/inplace";
+import { InplaceFrame, getInplaceBootstrap } from "@thereactnativerewind/inplace/server";
 import "./globals.css";
 
 const serif = Fraunces({
@@ -15,18 +15,18 @@ const sans = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Harbor & Co. — Site Editor demo",
-  description: "A marketing page whose copy can be edited in place with Site Editor.",
+  title: "Harbor & Co. — Inplace demo",
+  description: "A marketing page whose copy can be edited in place with Inplace.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const bootstrap = getEditorBootstrap();
+  const bootstrap = getInplaceBootstrap();
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable}`}>
       <body>
-        <SiteEditorProvider bootstrap={bootstrap}>
-          <SiteEditorFrame>{children}</SiteEditorFrame>
-        </SiteEditorProvider>
+        <InplaceProvider bootstrap={bootstrap}>
+          <InplaceFrame>{children}</InplaceFrame>
+        </InplaceProvider>
       </body>
     </html>
   );
