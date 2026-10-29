@@ -1,0 +1,22 @@
+import type { VersionSummary } from "../types.js";
+export declare function EditorChrome({ open, authenticated, email, editing, loginOpen, historyOpen, versions, status, error, busy, onEdit, onDone, onPublish, onUndo, onRestore, onToggleHistory, onLogin, onCloseLogin, onLogout, }: {
+    open: boolean;
+    authenticated: boolean;
+    email: string | null;
+    editing: boolean;
+    loginOpen: boolean;
+    historyOpen: boolean;
+    versions: VersionSummary[];
+    status: string;
+    error: string;
+    busy: boolean;
+    onEdit: () => void;
+    onDone: () => void;
+    onPublish: () => void;
+    onUndo: () => void;
+    onRestore: (version: number) => void;
+    onToggleHistory: () => void;
+    onLogin: (email: string) => Promise<void>;
+    onCloseLogin: () => void;
+    onLogout: () => void;
+}): import("react").JSX.Element;

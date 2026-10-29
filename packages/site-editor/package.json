@@ -75,7 +75,6 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts",
-    "prepare": "tsc -p tsconfig.json",
     "test:postgres": "tsx --test test/postgres.integration.test.ts",
     "migrate": "node dist/cli/migrate.js",
     "prepublishOnly": "npm run build"

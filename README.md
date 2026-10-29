@@ -141,7 +141,7 @@ Open http://localhost:3000.
 
 For an Astro site on `@astrojs/vercel`. The editor core is shared with Next.js. The toolbar is a small script, not a React island.
 
-The package is not on npm yet. Install the workspace package from this branch. `prepare` compiles TypeScript on install, because `dist` is not committed.
+The package is not on npm yet. Install the workspace package from this branch. `packages/site-editor/dist` is committed so the install does not need a build script. pnpm 10 blocks dependency build scripts unless the package is allowlisted, which is why `dist` ships in git until the package is published.
 
 ```json
 "@thereactnativerewind/site-editor": "github:lukebrandonfarrell/site-editor#cursor/site-editor-v1-1dfc&path:packages/site-editor"
