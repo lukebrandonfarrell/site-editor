@@ -8,7 +8,7 @@ import {
   GET,
   prerender,
 } from "../src/astro/index.ts";
-import { mountSiteEditor, shouldRevealEditor } from "../src/astro/editor-client.ts";
+import { mountSiteEditor, shouldRevealEditor, shouldShowEditorChrome } from "../src/astro/editor-client.ts";
 import { editorStyles } from "../src/client/styles.ts";
 import { resolveEditableText } from "../src/content/published.ts";
 import { seedSpot } from "../src/content/service.ts";
@@ -71,6 +71,31 @@ test("the edit button stays hidden when the session request fails", () => {
   assert.equal(shouldRevealEditor({ open: true, authenticated: false, failed: true, loginRequested: false }), false);
   assert.equal(shouldRevealEditor({ open: false, authenticated: false, failed: true, loginRequested: true }), false);
   assert.equal(shouldRevealEditor({ open: true, authenticated: false, failed: false, loginRequested: false }), true);
+});
+
+test("editor chrome stays hidden until a session or preview is confirmed", () => {
+  const hidden = {
+    confirmed: false,
+    open: true,
+    authenticated: false,
+    failed: false,
+    loginRequested: false,
+  };
+  assert.equal(shouldShowEditorChrome(hidden), false);
+  assert.equal(shouldShowEditorChrome({ ...hidden, confirmed: true, open: false }), false);
+  assert.equal(shouldShowEditorChrome({ ...hidden, confirmed: true }), true);
+  assert.equal(
+    shouldShowEditorChrome({ ...hidden, confirmed: true, open: false, authenticated: true }),
+    true,
+  );
+  assert.equal(
+    shouldShowEditorChrome({ ...hidden, confirmed: true, open: false, failed: true, loginRequested: true }),
+    false,
+  );
+  assert.match(
+    editorStyles,
+    /html:not\(\[data-site-editor-chrome="on"\]\) \.site-editor-launch[\s\S]*\.site-editor-bar[\s\S]*display:\s*none\s*!important/,
+  );
 });
 
 test("session reports a disabled editor when the database is not configured", async () => {

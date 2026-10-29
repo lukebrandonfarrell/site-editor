@@ -15,5 +15,5 @@ export declare function restoreSite(store: ContentStore, snapshots: SnapshotStor
 export declare function undoSite(store: ContentStore, snapshots: SnapshotStore, siteId: string, actor: string | null): Promise<PublishResult>;
 export declare function readPublishedOrSnapshot(store: Pick<ContentStore, "listSpots">, snapshots: SnapshotStore, siteId: string): Promise<{
     content: ContentMap;
-    source: "database" | "snapshot";
+    source: "database" | "snapshot" | "seed";
 }>;

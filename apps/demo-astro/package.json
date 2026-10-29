@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@astrojs/vercel": "9.0.5",
-    "@thereactnativerewind/site-editor": "0.2.1",
+    "@thereactnativerewind/site-editor": "0.2.2",
     "astro": "5.18.2"
   }
 }

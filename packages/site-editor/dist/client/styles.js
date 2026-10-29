@@ -1,7 +1,6 @@
 export const editorStyles = `
 .site-editor-launch,
 .site-editor-bar,
-.site-editor-history,
 .site-editor-dialog {
   font-family: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -11,15 +10,17 @@ export const editorStyles = `
   right: 20px;
   bottom: 20px;
   z-index: 60;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
   border: 0;
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 0;
   background: #221c16;
   color: #f6f1e6;
   box-shadow: 0 12px 30px rgba(34, 28, 22, 0.22);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
 }
 .site-editor-launch:hover { background: #3a3128; }
 .site-editor-bar {
@@ -32,18 +33,11 @@ export const editorStyles = `
   align-items: center;
   gap: 8px;
   max-width: calc(100vw - 24px);
-  padding: 8px 8px 8px 14px;
+  padding: 8px;
   border-radius: 16px;
   background: #221c16;
   color: #f6f1e6;
   box-shadow: 0 18px 50px rgba(34, 28, 22, 0.28);
-}
-.site-editor-brand {
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-right: 4px;
 }
 .site-editor-status {
   font-size: 13px;
@@ -55,7 +49,6 @@ export const editorStyles = `
 }
 .site-editor-error { color: #ffb4a2; }
 .site-editor-bar button,
-.site-editor-history button,
 .site-editor-dialog button {
   border: 0;
   border-radius: 10px;
@@ -67,38 +60,47 @@ export const editorStyles = `
   font-size: 13px;
   font-weight: 600;
 }
-.site-editor-bar button:hover,
-.site-editor-history button:hover { background: rgba(255, 255, 255, 0.08); }
-.site-editor-bar button:disabled { opacity: 0.4; cursor: default; }
+.site-editor-bar button:hover { background: rgba(255, 255, 255, 0.08); }
+.site-editor-bar button:disabled { opacity: 0.55; cursor: default; }
+.site-editor-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border-radius: 999px !important;
+  flex: none;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+.site-editor-overflow { position: relative; flex: none; }
+.site-editor-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 148px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #2c261f;
+  box-shadow: 0 12px 30px rgba(34, 28, 22, 0.28);
+}
+.site-editor-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+  color: #f6f1e6;
+}
 .site-editor-publish {
   background: #e4ff6a !important;
   color: #221c16 !important;
 }
 .site-editor-publish:hover { background: #efffb0 !important; }
-.site-editor-history {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 61;
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(70vh, 640px);
-  overflow: auto;
-  background: #f7f1e6;
-  color: #221c16;
-  border-radius: 18px;
-  box-shadow: 0 18px 50px rgba(34, 28, 22, 0.2);
-  padding: 16px;
+.site-editor-publish-quiet {
+  background: transparent !important;
+  color: #b7ad9f !important;
 }
-.site-editor-history h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
-}
-.site-editor-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.site-editor-history li {
-  border-top: 1px solid rgba(34, 28, 22, 0.12);
-  padding-top: 10px;
-}
-.site-editor-history p { margin: 2px 0 8px; color: #5c5348; font-size: 12px; }
+.site-editor-publish-quiet:hover { background: rgba(255, 255, 255, 0.08) !important; }
 .site-editor-dialog {
   position: fixed;
   inset: 0;
@@ -142,10 +144,17 @@ html[data-site-editor-editing="true"] [data-site-editor-spot]:focus {
 }
 html[data-site-editor-editing="true"] body { padding-bottom: 96px; }
 @media (prefers-reduced-motion: reduce) {
-  .site-editor-launch, .site-editor-bar, .site-editor-history { transition: none; }
+  .site-editor-launch, .site-editor-bar { transition: none; }
 }
 /* display:flex/grid on the bar and dialog would otherwise beat the hidden attribute. */
 .site-editor-root [hidden] {
+  display: none !important;
+}
+/* Stay invisible until a session or preview is confirmed. Beats display:flex/grid. */
+html:not([data-site-editor-chrome="on"]) .site-editor-launch,
+html:not([data-site-editor-chrome="on"]) .site-editor-bar,
+html:not([data-site-editor-chrome="on"]) .site-editor-dialog,
+html:not([data-site-editor-chrome="on"]) .site-editor-menu {
   display: none !important;
 }
 `;

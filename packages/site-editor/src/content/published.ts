@@ -1,10 +1,10 @@
 import { readConfig } from "../config.js";
 import { displayedText, type ContentSource } from "./display.js";
-import { seedSpot } from "./service.js";
+import { readPublishedOrSnapshot, seedSpot } from "./service.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { createSnapshotStore } from "../snapshot.js";
 import { createPostgresStores } from "../store/postgres.js";
 import type { ContentMap } from "../types.js";
-import { publishedMap } from "../validate.js";
 
 export type PublishedState = {
   content: ContentMap;
@@ -25,8 +25,12 @@ export async function loadPublishedState(): Promise<PublishedState> {
     const config = readConfig();
     if (!config.databaseUrl) return { content: {}, source: "seed" };
     try {
-      const spots = await createPostgresStores(config.databaseUrl).content.listSpots(config.siteId);
-      return { content: publishedMap(spots), source: "database" };
+      await ensureCurrentSchema(config.databaseUrl);
+      return await readPublishedOrSnapshot(
+        createPostgresStores(config.databaseUrl).content,
+        createSnapshotStore(),
+        config.siteId,
+      );
     } catch (error) {
       warn("Database read failed. Trying the published snapshot.", error);
       try {

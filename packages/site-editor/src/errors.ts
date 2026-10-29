@@ -21,8 +21,17 @@ export class SchemaMissingError extends Error {
   readonly code = "schema_missing";
 
   constructor() {
-    super("Site Editor tables are missing. Run the database migration.");
+    super("Site Editor tables are missing. Run npx site-editor migrate.");
     this.name = "SchemaMissingError";
+  }
+}
+
+export class SchemaOutdatedError extends Error {
+  readonly code = "schema_outdated";
+
+  constructor(message = "Site Editor schema is out of date. Run npx site-editor migrate.") {
+    super(message);
+    this.name = "SchemaOutdatedError";
   }
 }
 

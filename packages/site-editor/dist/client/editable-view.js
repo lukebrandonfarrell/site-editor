@@ -3,11 +3,12 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import { useLayoutEffect, useRef } from "react";
 import { useDrafts } from "./context.js";
 export function EditableView({ id, publishedValue, className, }) {
-    const { editing, drafts, saveDraft } = useDrafts();
+    const { editing, drafts, published, saveDraft } = useDrafts();
+    const value = drafts[id] ?? published[id] ?? publishedValue;
     if (!editing) {
-        return (_jsx("span", { "data-site-editor-spot": id, className: className, children: publishedValue }));
+        return (_jsx("span", { "data-site-editor-spot": id, className: className, children: value }));
     }
-    return (_jsx(EditableField, { id: id, className: className, value: drafts[id] ?? publishedValue, onSave: (value) => saveDraft(id, value) }));
+    return (_jsx(EditableField, { id: id, className: className, value: value, onSave: (next) => saveDraft(id, next) }));
 }
 function EditableField({ id, value, className, onSave, }) {
     const ref = useRef(null);

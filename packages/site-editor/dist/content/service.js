@@ -1,4 +1,4 @@
-import { ContentError, isDbUnavailable } from "../errors.js";
+import { ContentError } from "../errors.js";
 import { assertSpotId, publishedMap, textContent } from "../validate.js";
 export async function seedSpot(store, siteId, spotId, seed, limits) {
     assertSpotId(spotId);
@@ -71,9 +71,15 @@ export async function readPublishedOrSnapshot(store, snapshots, siteId) {
         return { content: publishedMap(spots), source: "database" };
     }
     catch (error) {
-        if (!isDbUnavailable(error))
-            throw error;
-        const snapshot = await snapshots.read(siteId);
-        return { content: snapshot?.content ?? {}, source: "snapshot" };
+        console.warn("[site-editor] Database read failed. Trying the published snapshot.", error instanceof Error ? error.message : error);
+        try {
+            const snapshot = await snapshots.read(siteId);
+            if (snapshot)
+                return { content: snapshot.content, source: "snapshot" };
+        }
+        catch (snapshotError) {
+            console.warn("[site-editor] Snapshot read failed. Serving seed text.", snapshotError instanceof Error ? snapshotError.message : snapshotError);
+        }
+        return { content: {}, source: "seed" };
     }
 }

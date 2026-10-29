@@ -1,6 +1,6 @@
 {
   "name": "@thereactnativerewind/site-editor",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Plug-in visual editor so clients can edit marked copy on a live Next.js or Astro site without a pull request or rebuild.",
   "license": "MIT",
   "author": "Luke Brandon Farrell",
@@ -79,7 +79,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts",
+    "test": "tsx --test test/content.test.ts test/handler.test.ts test/limits.test.ts test/snapshot.test.ts test/astro.test.ts test/schema.test.ts test/publish-state.test.ts",
     "test:postgres": "tsx --test test/postgres.integration.test.ts",
     "migrate": "node dist/cli/migrate.js",
     "prepublishOnly": "npm run build"

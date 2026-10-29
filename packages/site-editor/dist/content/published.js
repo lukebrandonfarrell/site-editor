@@ -1,9 +1,9 @@
 import { readConfig } from "../config.js";
 import { displayedText } from "./display.js";
-import { seedSpot } from "./service.js";
+import { readPublishedOrSnapshot, seedSpot } from "./service.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { createSnapshotStore } from "../snapshot.js";
 import { createPostgresStores } from "../store/postgres.js";
-import { publishedMap } from "../validate.js";
 /**
  * Read published copy without any framework cache.
  * Next.js wraps this in `unstable_cache`. Astro calls it on each origin render
@@ -18,8 +18,8 @@ export async function loadPublishedState() {
         if (!config.databaseUrl)
             return { content: {}, source: "seed" };
         try {
-            const spots = await createPostgresStores(config.databaseUrl).content.listSpots(config.siteId);
-            return { content: publishedMap(spots), source: "database" };
+            await ensureCurrentSchema(config.databaseUrl);
+            return await readPublishedOrSnapshot(createPostgresStores(config.databaseUrl).content, createSnapshotStore(), config.siteId);
         }
         catch (error) {
             warn("Database read failed. Trying the published snapshot.", error);

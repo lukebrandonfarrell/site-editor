@@ -1,27 +1,24 @@
+import { shouldShowEditorChrome } from "../client/chrome.js";
+import {
+  pendingChangeCount,
+  publishIsQuiet,
+  publishLabel,
+  textValueMap,
+  type PublishPhase,
+} from "../client/publish-state.js";
 import { editorStyles } from "../client/styles.js";
 
+export { shouldRevealEditor, shouldShowEditorChrome } from "../client/chrome.js";
+
 type TextContent = { type: "text"; value: string };
-type VersionRow = {
-  version: number;
-  createdAt: string;
-  actor: string | null;
-  restoredFrom: number | null;
-};
 
 const API = "/api/site-editor";
+const CHEVRON_DOWN =
+  '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6.5 8 11l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEVRON_UP =
+  '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 9.5 8 5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 let mounted = false;
-
-/** Closed chrome stays hidden even when a panel sets `display`. */
-export function shouldRevealEditor(input: {
-  open: boolean;
-  authenticated: boolean;
-  failed: boolean;
-  loginRequested: boolean;
-}): boolean {
-  if (input.failed) return false;
-  return input.open || input.authenticated || input.loginRequested;
-}
 
 export function mountSiteEditor(options?: { injectStyles?: boolean }): void {
   if (mounted || typeof document === "undefined") return;
@@ -44,25 +41,36 @@ function createUi(openByDefault: boolean) {
   const root = document.createElement("div");
   root.className = "site-editor-root";
 
-  const launch = button("Edit", "site-editor-launch");
+  const show = iconButton(CHEVRON_UP, "Show editor", "site-editor-launch");
+  show.hidden = true;
+
   const bar = document.createElement("div");
   bar.className = "site-editor-bar";
   bar.setAttribute("role", "toolbar");
+  bar.setAttribute("aria-label", "Site Editor");
   bar.hidden = true;
+  const hide = iconButton(CHEVRON_DOWN, "Hide editor", "site-editor-icon");
   const status = document.createElement("span");
   status.className = "site-editor-status";
-  const undo = button("Undo");
-  const history = button("History");
-  const done = button("Done");
-  const publish = button("Publish", "site-editor-publish");
-  const logout = button("Log out");
-  logout.hidden = true;
-  bar.append(brand(), status, undo, history, logout, done, publish);
-
-  const historyPanel = document.createElement("aside");
-  historyPanel.className = "site-editor-history";
-  historyPanel.hidden = true;
-  historyPanel.setAttribute("aria-label", "Version history");
+  status.hidden = true;
+  const overflow = document.createElement("div");
+  overflow.className = "site-editor-overflow";
+  overflow.hidden = true;
+  const more = iconButton("", "More", "site-editor-icon");
+  more.textContent = "···";
+  more.setAttribute("aria-haspopup", "menu");
+  const menu = document.createElement("div");
+  menu.className = "site-editor-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "menu");
+  const signOut = button("Sign out");
+  signOut.setAttribute("role", "menuitem");
+  menu.append(signOut);
+  overflow.append(more, menu);
+  const publish = button("Publish", "site-editor-publish site-editor-publish-quiet");
+  publish.disabled = true;
+  publish.setAttribute("aria-live", "polite");
+  bar.append(hide, status, overflow, publish);
 
   const dialog = document.createElement("div");
   dialog.className = "site-editor-dialog";
@@ -79,33 +87,53 @@ function createUi(openByDefault: boolean) {
   const send = button("Email me a link", "site-editor-publish");
   send.type = "submit";
   const cancel = button("Cancel");
-  form.append(heading("Sign in to edit"), paragraph("We’ll email a one-time link to an allowlisted address."), email, loginStatus, send, cancel);
+  form.append(
+    heading("Sign in to edit"),
+    paragraph("We’ll email a one-time link to an allowlisted address."),
+    email,
+    loginStatus,
+    send,
+    cancel,
+  );
   dialog.append(form);
 
-  root.append(launch, bar, historyPanel, dialog);
+  root.append(show, bar, dialog);
 
   let authenticated = false;
   let editing = false;
   let busy = false;
+  let phase: PublishPhase = "idle";
+  let published: Record<string, string> = {};
+  let drafts: Record<string, string> = {};
+  let confirmTimer = 0;
 
-  launch.addEventListener("click", () => {
-    if (openByDefault || authenticated) void enter();
-    else dialog.hidden = false;
+  hide.addEventListener("click", () => minimize());
+  show.addEventListener("click", () => reveal());
+  more.addEventListener("click", (event) => {
+    event.stopPropagation();
+    menu.hidden = !menu.hidden;
+    more.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
   });
-  done.addEventListener("click", () => leave());
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Node && overflow.contains(event.target)) return;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+  });
+  signOut.addEventListener("click", () => void logOut());
   publish.addEventListener("click", () => void publishDrafts());
-  undo.addEventListener("click", () => void undoLast());
-  history.addEventListener("click", () => {
-    historyPanel.hidden = !historyPanel.hidden;
-    if (!historyPanel.hidden) void renderHistory();
-  });
-  logout.addEventListener("click", () => void logOut());
   cancel.addEventListener("click", () => {
     dialog.hidden = true;
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void requestLink(email.value);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (!editing || busy) return;
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void publishDrafts();
+    }
   });
 
   document.addEventListener("focusout", (event) => {
@@ -119,11 +147,13 @@ function createUi(openByDefault: boolean) {
   });
 
   function hideChrome(): void {
-    launch.hidden = true;
+    show.hidden = true;
     bar.hidden = true;
-    historyPanel.hidden = true;
     dialog.hidden = true;
+    menu.hidden = true;
+    editing = false;
     delete document.documentElement.dataset.siteEditorEditing;
+    delete document.documentElement.dataset.siteEditorChrome;
   }
 
   async function start(): Promise<void> {
@@ -133,20 +163,24 @@ function createUi(openByDefault: boolean) {
       const session = await request("/session");
       if (session.enabled === false) throw new Error("Site Editor is disabled.");
       authenticated = session.authenticated === true;
-      logout.hidden = !authenticated;
-      const canEdit = shouldRevealEditor({
+      overflow.hidden = !authenticated;
+      const canEdit = shouldShowEditorChrome({
+        confirmed: true,
         open: openByDefault,
         authenticated,
         failed: false,
         loginRequested,
       });
-      launch.hidden = !canEdit;
-      if (!canEdit) return;
+      if (!canEdit) {
+        hideChrome();
+        return;
+      }
+      document.documentElement.dataset.siteEditorChrome = "on";
       if (flag === "login" || flag === "invalid" || (flag === "1" && !(openByDefault || authenticated))) {
         dialog.hidden = false;
         if (flag === "invalid") loginStatus.textContent = "That link is invalid or expired.";
       }
-      if (flag === "1" && (openByDefault || authenticated)) await enter();
+      if (openByDefault || authenticated) await enter();
     } catch {
       hideChrome();
     }
@@ -155,105 +189,127 @@ function createUi(openByDefault: boolean) {
   async function enter(): Promise<void> {
     editing = true;
     dialog.hidden = true;
-    launch.hidden = true;
+    show.hidden = true;
     bar.hidden = false;
     document.documentElement.dataset.siteEditorEditing = "true";
     for (const spot of spots()) spot.contentEditable = "true";
     try {
       const data = await request("/content");
-      const drafts = (data.drafts ?? {}) as Record<string, TextContent>;
-      for (const spot of spots()) {
-        const id = spot.getAttribute("data-site-editor-spot");
-        const draft = id ? drafts[id] : undefined;
-        if (draft?.type === "text" && spot.textContent !== draft.value) spot.textContent = draft.value;
-      }
-      status.textContent = "Editing drafts";
-      await renderHistory();
+      published = textValueMap(data.published as Record<string, TextContent> | undefined);
+      drafts = textValueMap(data.drafts as Record<string, TextContent> | undefined);
+      applyDraftText();
+      clearNotice();
     } catch (error) {
-      status.textContent = message(error);
-      status.classList.add("site-editor-error");
+      rememberCurrentText();
+      showNotice(message(error));
     }
+    refreshPublish();
   }
 
-  function leave(): void {
+  function minimize(): void {
     editing = false;
     bar.hidden = true;
-    historyPanel.hidden = true;
-    launch.hidden = false;
+    menu.hidden = true;
+    show.hidden = false;
     delete document.documentElement.dataset.siteEditorEditing;
     for (const spot of spots()) spot.contentEditable = "false";
   }
 
+  function reveal(): void {
+    editing = true;
+    show.hidden = true;
+    bar.hidden = false;
+    document.documentElement.dataset.siteEditorEditing = "true";
+    for (const spot of spots()) spot.contentEditable = "true";
+  }
+
+  function applyDraftText(): void {
+    for (const spot of spots()) {
+      const id = spot.getAttribute("data-site-editor-spot");
+      if (!id) continue;
+      if (published[id] === undefined) published[id] = spot.textContent ?? "";
+      const draft = drafts[id];
+      if (draft !== undefined && spot.textContent !== draft) spot.textContent = draft;
+    }
+  }
+
+  function rememberCurrentText(): void {
+    for (const spot of spots()) {
+      const id = spot.getAttribute("data-site-editor-spot");
+      if (!id) continue;
+      const value = spot.textContent ?? "";
+      if (published[id] === undefined) published[id] = value;
+      if (drafts[id] === undefined) drafts[id] = published[id] ?? value;
+    }
+  }
+
+  function refreshPublish(): void {
+    const count = pendingChangeCount(published, drafts);
+    publish.textContent = publishLabel(count, phase);
+    publish.disabled = busy || count === 0;
+    publish.classList.toggle("site-editor-publish-quiet", publishIsQuiet(count, phase));
+  }
+
+  function clearNotice(): void {
+    status.hidden = true;
+    status.textContent = "";
+    status.classList.remove("site-editor-error");
+  }
+
+  function showNotice(text: string): void {
+    status.hidden = false;
+    status.classList.add("site-editor-error");
+    status.textContent = text;
+  }
+
   async function saveDraft(id: string, value: string): Promise<void> {
+    drafts[id] = value;
+    phase = "idle";
+    window.clearTimeout(confirmTimer);
+    refreshPublish();
     try {
       await request("/drafts", {
         method: "PUT",
         body: JSON.stringify({ id, content: { type: "text", value } }),
       });
-      status.classList.remove("site-editor-error");
-      status.textContent = "Draft saved";
+      clearNotice();
     } catch (error) {
-      status.classList.add("site-editor-error");
-      status.textContent = message(error);
+      showNotice(message(error));
     }
+  }
+
+  async function flushFocused(): Promise<void> {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) return;
+    const id = active.getAttribute("data-site-editor-spot");
+    if (!id) return;
+    await saveDraft(id, active.textContent ?? "");
   }
 
   async function publishDrafts(): Promise<void> {
     if (busy) return;
+    await flushFocused();
+    if (pendingChangeCount(published, drafts) === 0) return;
     busy = true;
-    status.textContent = "Publishing…";
+    phase = "publishing";
+    refreshPublish();
     try {
-      const data = await request("/publish", { method: "POST", body: "{}" });
-      status.classList.remove("site-editor-error");
-      status.textContent = `Published version ${String(data.version)}`;
-      window.setTimeout(() => window.location.assign(window.location.pathname), 400);
+      await request("/publish", { method: "POST", body: "{}" });
+      published = { ...published, ...drafts };
+      phase = "published";
+      clearNotice();
+      window.clearTimeout(confirmTimer);
+      confirmTimer = window.setTimeout(() => {
+        phase = "idle";
+        refreshPublish();
+      }, 2200);
     } catch (error) {
-      status.classList.add("site-editor-error");
-      status.textContent = message(error);
+      phase = "idle";
+      showNotice(message(error));
+    } finally {
       busy = false;
+      refreshPublish();
     }
-  }
-
-  async function undoLast(): Promise<void> {
-    try {
-      await request("/versions/undo", { method: "POST", body: "{}" });
-      window.location.assign(window.location.pathname);
-    } catch (error) {
-      status.classList.add("site-editor-error");
-      status.textContent = message(error);
-    }
-  }
-
-  async function renderHistory(): Promise<void> {
-    const data = await request("/versions");
-    const versions = (data.versions ?? []) as VersionRow[];
-    undo.disabled = versions.length < 2;
-    historyPanel.replaceChildren(heading("Published versions"));
-    if (versions.length === 0) {
-      historyPanel.append(paragraph("Nothing has been published yet."));
-      return;
-    }
-    const list = document.createElement("ul");
-    for (const version of versions) {
-      const item = document.createElement("li");
-      const title = document.createElement("strong");
-      title.textContent = `Version ${version.version}${version.restoredFrom ? ` · restored from ${version.restoredFrom}` : ""}`;
-      const meta = document.createElement("p");
-      meta.textContent = `${new Date(version.createdAt).toLocaleString()} · ${version.actor ?? "Unknown"}`;
-      const restore = button("Restore");
-      restore.addEventListener("click", () => void restoreVersion(version.version));
-      item.append(title, meta, restore);
-      list.append(item);
-    }
-    historyPanel.append(list);
-  }
-
-  async function restoreVersion(version: number): Promise<void> {
-    await request("/versions/restore", {
-      method: "POST",
-      body: JSON.stringify({ version }),
-    });
-    window.location.assign(window.location.pathname);
   }
 
   async function requestLink(address: string): Promise<void> {
@@ -270,8 +326,24 @@ function createUi(openByDefault: boolean) {
   }
 
   async function logOut(): Promise<void> {
+    menu.hidden = true;
     await request("/auth/logout", { method: "POST", body: "{}" });
-    window.location.assign(window.location.pathname);
+    authenticated = false;
+    overflow.hidden = true;
+    for (const spot of spots()) {
+      const id = spot.getAttribute("data-site-editor-spot");
+      if (!id || published[id] === undefined) continue;
+      spot.textContent = published[id];
+    }
+    drafts = { ...published };
+    phase = "idle";
+    refreshPublish();
+    if (openByDefault) return;
+    editing = false;
+    bar.hidden = true;
+    show.hidden = true;
+    delete document.documentElement.dataset.siteEditorEditing;
+    for (const spot of spots()) spot.contentEditable = "false";
   }
 
   return { root, start };
@@ -289,10 +361,12 @@ function button(label: string, className?: string): HTMLButtonElement {
   return element;
 }
 
-function brand(): HTMLSpanElement {
-  const element = document.createElement("span");
-  element.className = "site-editor-brand";
-  element.textContent = "Site Editor";
+function iconButton(svg: string, label: string, className: string): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.className = className;
+  element.setAttribute("aria-label", label);
+  if (svg) element.innerHTML = svg;
   return element;
 }
 

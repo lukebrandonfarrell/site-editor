@@ -1,4 +1,4 @@
-import { ContentError, isDbUnavailable } from "../errors.js";
+import { ContentError } from "../errors.js";
 import type { ContentStore } from "../store/types.js";
 import type { SnapshotStore } from "../snapshot.js";
 import type { ContentMap, PublishResult, TextContent } from "../types.js";
@@ -114,13 +114,24 @@ export async function readPublishedOrSnapshot(
   store: Pick<ContentStore, "listSpots">,
   snapshots: SnapshotStore,
   siteId: string,
-): Promise<{ content: ContentMap; source: "database" | "snapshot" }> {
+): Promise<{ content: ContentMap; source: "database" | "snapshot" | "seed" }> {
   try {
     const spots = await store.listSpots(siteId);
     return { content: publishedMap(spots), source: "database" };
   } catch (error) {
-    if (!isDbUnavailable(error)) throw error;
-    const snapshot = await snapshots.read(siteId);
-    return { content: snapshot?.content ?? {}, source: "snapshot" };
+    console.warn(
+      "[site-editor] Database read failed. Trying the published snapshot.",
+      error instanceof Error ? error.message : error,
+    );
+    try {
+      const snapshot = await snapshots.read(siteId);
+      if (snapshot) return { content: snapshot.content, source: "snapshot" };
+    } catch (snapshotError) {
+      console.warn(
+        "[site-editor] Snapshot read failed. Serving seed text.",
+        snapshotError instanceof Error ? snapshotError.message : snapshotError,
+      );
+    }
+    return { content: {}, source: "seed" };
   }
 }

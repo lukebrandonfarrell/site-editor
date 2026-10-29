@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import type { SiteEditorBootstrap, TextContent, VersionSummary } from "../types.js";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { SiteEditorBootstrap, TextContent } from "../types.js";
+import { shouldShowEditorChrome } from "./chrome.js";
 import { DraftContext } from "./context.js";
+import { pendingChangeCount, textValueMap, type PublishPhase } from "./publish-state.js";
 import { editorStyles } from "./styles.js";
 import { EditorChrome } from "./toolbar.js";
 
@@ -29,14 +30,6 @@ async function requestJson(url: string, init?: RequestInit): Promise<Record<stri
   return data;
 }
 
-function textMap(content: ContentMap | undefined): Record<string, string> {
-  const next: Record<string, string> = {};
-  for (const [id, value] of Object.entries(content ?? {})) {
-    if (value?.type === "text") next[id] = value.value;
-  }
-  return next;
-}
-
 export function SiteEditorProvider({
   bootstrap,
   children,
@@ -47,22 +40,45 @@ export function SiteEditorProvider({
   /** Set false and import `@thereactnativerewind/site-editor/styles.css` instead of an inline style tag. */
   injectStyles?: boolean;
 }) {
-  const router = useRouter();
   const api = bootstrap.apiBase;
   const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [started, setStarted] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [versions, setVersions] = useState<VersionSummary[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [publishedTexts, setPublishedTexts] = useState<Record<string, string>>({});
   const [loginOpen, setLoginOpen] = useState(false);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [loginStatus, setLoginStatus] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [phase, setPhase] = useState<PublishPhase>("idle");
   const [busy, setBusy] = useState(false);
   const [sessionFailed, setSessionFailed] = useState(false);
+  const draftsRef = useRef(drafts);
+  const publishedRef = useRef(publishedTexts);
+  const busyRef = useRef(false);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  draftsRef.current = drafts;
+  publishedRef.current = publishedTexts;
 
   const canEdit = !sessionFailed && (bootstrap.open || authenticated);
+  const pending = pendingChangeCount(publishedTexts, drafts);
+  const chromeOn = shouldShowEditorChrome({
+    confirmed: ready,
+    open: bootstrap.open,
+    authenticated,
+    failed: sessionFailed,
+    loginRequested: loginOpen,
+  });
+
+  useEffect(() => {
+    if (chromeOn) document.documentElement.dataset.siteEditorChrome = "on";
+    else delete document.documentElement.dataset.siteEditorChrome;
+    return () => {
+      delete document.documentElement.dataset.siteEditorChrome;
+    };
+  }, [chromeOn]);
 
   useEffect(() => {
     if (editing) document.documentElement.dataset.siteEditorEditing = "true";
@@ -71,6 +87,13 @@ export function SiteEditorProvider({
       delete document.documentElement.dataset.siteEditorEditing;
     };
   }, [editing]);
+
+  useEffect(
+    () => () => {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    },
+    [],
+  );
 
   const loadSession = useCallback(async () => {
     const response = await fetch(`${api}/session`, { cache: "no-store" });
@@ -86,7 +109,6 @@ export function SiteEditorProvider({
       return false;
     }
     setAuthenticated(Boolean(data.authenticated));
-    setEmail(data.email ?? null);
     setReady(true);
     return Boolean(data.authenticated);
   }, [api]);
@@ -98,114 +120,98 @@ export function SiteEditorProvider({
     });
   }, [loadSession]);
 
-  const loadDrafts = useCallback(async () => {
-    const data = await requestJson(`${api}/content`);
-    setDrafts(textMap(data.drafts as ContentMap | undefined));
-  }, [api]);
-
-  const loadVersions = useCallback(async () => {
-    const data = await requestJson(`${api}/versions`);
-    setVersions((data.versions as VersionSummary[] | undefined) ?? []);
-  }, [api]);
-
   const enterEditing = useCallback(async () => {
-    setError("");
     setLoginOpen(false);
-    setEditing(true);
+    setNotice("");
     try {
-      await Promise.all([loadDrafts(), loadVersions()]);
-      setStatus("Editing drafts");
+      const data = await requestJson(`${api}/content`);
+      const published = textValueMap(data.published as ContentMap | undefined);
+      const nextDrafts = textValueMap(data.drafts as ContentMap | undefined);
+      publishedRef.current = published;
+      draftsRef.current = nextDrafts;
+      setPublishedTexts(published);
+      setDrafts(nextDrafts);
+      setEditing(true);
+      setMinimized(false);
     } catch (cause) {
-      setEditing(false);
-      setError(cause instanceof Error ? cause.message : "Could not open the editor");
+      setNotice(cause instanceof Error ? cause.message : "Could not open the editor");
+      setEditing(true);
+      setMinimized(false);
     }
-  }, [loadDrafts, loadVersions]);
+  }, [api]);
+
+  useEffect(() => {
+    if (!ready || started || !canEdit) return;
+    setStarted(true);
+    void enterEditing();
+  }, [ready, started, canEdit, enterEditing]);
 
   useEffect(() => {
     if (!ready) return;
     const flag = new URLSearchParams(window.location.search).get("site-editor");
     if (flag === "invalid") {
       setLoginOpen(true);
-      setError("That link is invalid or expired.");
-    } else if (flag === "login" || (flag === "1" && !canEdit)) {
+      setLoginError("That link is invalid or expired.");
+    } else if ((flag === "login" || flag === "1") && !canEdit) {
       setLoginOpen(true);
-    } else if (flag === "1" && canEdit) {
-      void enterEditing();
     }
-  }, [ready, canEdit, enterEditing]);
+  }, [ready, canEdit]);
 
   const saveDraft = useCallback(
     async (id: string, value: string) => {
-      setDrafts((current) => ({ ...current, [id]: value }));
+      const next = { ...draftsRef.current, [id]: value };
+      draftsRef.current = next;
+      setDrafts(next);
+      setPhase("idle");
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
       try {
         await requestJson(`${api}/drafts`, {
           method: "PUT",
           body: JSON.stringify({ id, content: { type: "text", value } }),
         });
-        setStatus("Draft saved");
-        setError("");
+        setNotice("");
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not save draft");
+        setNotice(cause instanceof Error ? cause.message : "Could not save draft");
       }
     },
     [api],
   );
 
+  const flushFocused = useCallback(async () => {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) return;
+    const id = active.getAttribute("data-site-editor-spot");
+    if (!id) return;
+    await saveDraft(id, active.textContent ?? "");
+  }, [saveDraft]);
+
   const publish = useCallback(async () => {
+    if (busyRef.current) return;
+    await flushFocused();
+    if (pendingChangeCount(publishedRef.current, draftsRef.current) === 0) return;
+    busyRef.current = true;
     setBusy(true);
-    setError("");
-    setStatus("Publishing…");
+    setPhase("publishing");
+    setNotice("");
     try {
-      const data = await requestJson(`${api}/publish`, { method: "POST", body: "{}" });
-      await Promise.all([loadDrafts(), loadVersions()]);
-      setStatus(`Published version ${String(data.version)}`);
-      router.refresh();
+      await requestJson(`${api}/publish`, { method: "POST", body: "{}" });
+      const nextPublished = { ...publishedRef.current, ...draftsRef.current };
+      publishedRef.current = nextPublished;
+      setPublishedTexts(nextPublished);
+      setPhase("published");
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+      confirmTimer.current = setTimeout(() => setPhase("idle"), 2200);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Publish failed");
+      setPhase("idle");
+      setNotice(cause instanceof Error ? cause.message : "Publish failed");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }, [api, loadDrafts, loadVersions, router]);
-
-  const restore = useCallback(
-    async (version: number) => {
-      setBusy(true);
-      setError("");
-      try {
-        const data = await requestJson(`${api}/versions/restore`, {
-          method: "POST",
-          body: JSON.stringify({ version }),
-        });
-        await Promise.all([loadDrafts(), loadVersions()]);
-        setStatus(`Restored as version ${String(data.version)}`);
-        setHistoryOpen(false);
-        router.refresh();
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Restore failed");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [api, loadDrafts, loadVersions, router],
-  );
-
-  const undo = useCallback(async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const data = await requestJson(`${api}/versions/undo`, { method: "POST", body: "{}" });
-      await Promise.all([loadDrafts(), loadVersions()]);
-      setStatus(`Undid to version ${String(data.version)}`);
-      router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Nothing to undo");
-    } finally {
-      setBusy(false);
-    }
-  }, [api, loadDrafts, loadVersions, router]);
+  }, [api, flushFocused]);
 
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || minimized) return;
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
@@ -214,21 +220,21 @@ export function SiteEditorProvider({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editing, publish]);
+  }, [editing, minimized, publish]);
 
   const requestLink = useCallback(
     async (address: string) => {
       setBusy(true);
-      setError("");
-      setStatus("");
+      setLoginError("");
+      setLoginStatus("");
       try {
         await requestJson(`${api}/auth/request`, {
           method: "POST",
           body: JSON.stringify({ email: address }),
         });
-        setStatus("Check your email for a sign-in link.");
+        setLoginStatus("Check your email for a sign-in link.");
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not send the link");
+        setLoginError(cause instanceof Error ? cause.message : "Could not send the link");
       } finally {
         setBusy(false);
       }
@@ -239,53 +245,49 @@ export function SiteEditorProvider({
   const logout = useCallback(async () => {
     await requestJson(`${api}/auth/logout`, { method: "POST", body: "{}" });
     setAuthenticated(false);
-    setEmail(null);
+    setLoginOpen(false);
+    setNotice("");
+    draftsRef.current = {};
+    setDrafts({});
+    if (bootstrap.open) return;
     setEditing(false);
-    setHistoryOpen(false);
-    setStatus("");
-    router.refresh();
-  }, [api, router]);
+    setMinimized(false);
+    setStarted(false);
+  }, [api, bootstrap.open]);
 
   const draftValue = useMemo(
-    () => ({ editing, drafts, saveDraft }),
-    [editing, drafts, saveDraft],
+    () => ({ editing, drafts, published: publishedTexts, saveDraft }),
+    [editing, drafts, publishedTexts, saveDraft],
   );
-
-  const onEdit = () => {
-    if (canEdit) void enterEditing();
-    else setLoginOpen(true);
-  };
 
   return (
     <DraftContext.Provider value={draftValue}>
       {injectStyles ? <style dangerouslySetInnerHTML={{ __html: editorStyles }} /> : null}
       {children}
       <EditorChrome
-        open={bootstrap.open}
+        showBar={canEdit && editing && !minimized}
+        minimized={canEdit && minimized}
         authenticated={authenticated}
-        email={email}
-        editing={editing}
-        loginOpen={loginOpen}
-        historyOpen={historyOpen}
-        versions={versions}
-        status={status}
-        error={error}
+        pending={pending}
+        phase={phase}
+        notice={notice}
+        loginOpen={loginOpen && !canEdit}
+        loginStatus={loginStatus}
+        loginError={loginError}
         busy={busy}
-        onEdit={onEdit}
-        onDone={() => {
-          setEditing(false);
-          setHistoryOpen(false);
-          setStatus("");
-          setError("");
-        }}
         onPublish={() => void publish()}
-        onUndo={() => void undo()}
-        onRestore={(version) => void restore(version)}
-        onToggleHistory={() => setHistoryOpen((open) => !open)}
+        onMinimize={() => {
+          setMinimized(true);
+          setEditing(false);
+        }}
+        onShow={() => {
+          setMinimized(false);
+          setEditing(true);
+        }}
         onLogin={requestLink}
         onCloseLogin={() => {
           setLoginOpen(false);
-          setError("");
+          setLoginError("");
         }}
         onLogout={() => void logout()}
       />

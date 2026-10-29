@@ -1,21 +1,18 @@
-import type { VersionSummary } from "../types.js";
-export declare function EditorChrome({ open, authenticated, email, editing, loginOpen, historyOpen, versions, status, error, busy, onEdit, onDone, onPublish, onUndo, onRestore, onToggleHistory, onLogin, onCloseLogin, onLogout, }: {
-    open: boolean;
+import { type PublishPhase } from "./publish-state.js";
+export declare function EditorChrome({ showBar, minimized, authenticated, pending, phase, notice, loginOpen, loginStatus, loginError, busy, onPublish, onMinimize, onShow, onLogin, onCloseLogin, onLogout, }: {
+    showBar: boolean;
+    minimized: boolean;
     authenticated: boolean;
-    email: string | null;
-    editing: boolean;
+    pending: number;
+    phase: PublishPhase;
+    notice: string;
     loginOpen: boolean;
-    historyOpen: boolean;
-    versions: VersionSummary[];
-    status: string;
-    error: string;
+    loginStatus: string;
+    loginError: string;
     busy: boolean;
-    onEdit: () => void;
-    onDone: () => void;
     onPublish: () => void;
-    onUndo: () => void;
-    onRestore: (version: number) => void;
-    onToggleHistory: () => void;
+    onMinimize: () => void;
+    onShow: () => void;
     onLogin: (email: string) => Promise<void>;
     onCloseLogin: () => void;
     onLogout: () => void;

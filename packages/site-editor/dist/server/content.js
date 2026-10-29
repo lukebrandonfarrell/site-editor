@@ -4,6 +4,7 @@ import { cache } from "react";
 import { readConfig } from "../config.js";
 import { resolveFromState } from "../content/published.js";
 import { seedSpot } from "../content/service.js";
+import { ensureCurrentSchema } from "../schema/migrate.js";
 import { createSnapshotStore } from "../snapshot.js";
 import { createPostgresStores } from "../store/postgres.js";
 import { publishedMap } from "../validate.js";
@@ -26,6 +27,7 @@ export const getPublishedContent = cache(async () => {
     if (!config.databaseUrl)
         return { content: {}, source: "seed" };
     try {
+        await ensureCurrentSchema(config.databaseUrl);
         const content = await loadPublishedCached(config.siteId);
         return { content, source: "database" };
     }

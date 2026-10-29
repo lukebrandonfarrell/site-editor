@@ -1,6 +1,6 @@
 import pg from "pg";
 import { applyVersionContent, promoteDrafts } from "../content/transition.js";
-import { DatabaseUnavailableError, SchemaMissingError, isDbUnavailable, } from "../errors.js";
+import { DatabaseUnavailableError, SchemaMissingError, SchemaOutdatedError, isDbUnavailable, } from "../errors.js";
 import { ContentError } from "../errors.js";
 import { isTextContent, sanitizeContentMap } from "../validate.js";
 const { Pool } = pg;
@@ -28,6 +28,9 @@ export async function closePool() {
 function mapPgError(error) {
     if (error && typeof error === "object" && "code" in error && error.code === "42P01") {
         throw new SchemaMissingError();
+    }
+    if (error && typeof error === "object" && "code" in error && error.code === "42703") {
+        throw new SchemaOutdatedError("The database is missing a column this version needs. Run npx site-editor migrate.");
     }
     if (isDbUnavailable(error)) {
         const message = error instanceof Error ? error.message : "Database is unreachable";
