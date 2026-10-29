@@ -36,6 +36,7 @@ Do not publish the package to npm from a pull request. Publishing is a maintaine
 - Add or update a test when you change seeding, drafts, publish, restore, auth, or rate limits.
 - Keep `<Editable>` text-only unless the change is explicitly the image or spacing work on the roadmap.
 - Match the existing TypeScript style: strict, small modules, no new dependencies unless the feature needs them.
+- If you change `packages/site-editor/src`, run `npm run build -w @thereactnativerewind/site-editor` and commit `packages/site-editor/dist`. That build is what git installs use until the package is on npm.
 
 ## Design notes
 
