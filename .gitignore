@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Published-content snapshots written when the database is the source of truth
+.site-editor/
