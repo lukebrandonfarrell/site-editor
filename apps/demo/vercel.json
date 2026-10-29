@@ -1,4 +1,4 @@
 {
   "installCommand": "cd ../.. && npm install",
-  "buildCommand": "cd ../.. && npm run build -w @thereactnativerewind/site-editor && cd apps/demo && npx next build"
+  "buildCommand": "cd ../.. && npm run build -w @thereactnativerewind/inplace && cd apps/demo && npx next build"
 }

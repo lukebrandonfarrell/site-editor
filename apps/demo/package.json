@@ -1,5 +1,5 @@
 {
-  "name": "site-editor-demo",
+  "name": "inplace-demo",
   "private": true,
   "version": "0.1.0",
   "scripts": {
@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@thereactnativerewind/site-editor": "0.2.2",
+    "@thereactnativerewind/inplace": "0.3.0",
     "next": "^16.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

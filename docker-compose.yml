@@ -4,11 +4,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: site_editor
+      POSTGRES_DB: inplace
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d site_editor"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inplace"]
       interval: 2s
       timeout: 5s
       retries: 20

@@ -2,7 +2,7 @@
 
 ## Our pledge
 
-We as members, contributors, and leaders pledge to make participation in Site Editor a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+We as members, contributors, and leaders pledge to make participation in Inplace a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.
 
@@ -28,7 +28,7 @@ Examples of unacceptable behavior:
 
 Community leaders of The React Native Rewind are responsible for clarifying and enforcing these standards. They will take appropriate and fair corrective action in response to any behavior they deem inappropriate, threatening, offensive, or harmful.
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported via [GitHub security advisories](https://github.com/lukebrandonfarrell/site-editor/security/advisories) or by opening a private report to the repository maintainers. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported via [GitHub security advisories](https://github.com/the-react-native-rewind/inplace/security/advisories) or by opening a private report to the repository maintainers. All complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 

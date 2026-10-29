@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Site Editor does not behave the way the docs describe.
+description: Something in Inplace does not behave the way the docs describe.
 title: ""
 labels: ["bug"]
 body:

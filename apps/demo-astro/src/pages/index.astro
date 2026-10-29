@@ -1,8 +1,8 @@
 ---
 export const prerender = false;
 
-import { applyEditableCacheHeaders } from "@thereactnativerewind/site-editor/astro";
-import Editable from "@thereactnativerewind/site-editor/astro/Editable.astro";
+import { applyEditableCacheHeaders } from "@thereactnativerewind/inplace/astro";
+import Editable from "@thereactnativerewind/inplace/astro/Editable.astro";
 import "../styles/global.css";
 
 applyEditableCacheHeaders(Astro.response);
@@ -13,7 +13,7 @@ applyEditableCacheHeaders(Astro.response);
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Harbor & Co. — Astro</title>
-    <meta name="description" content="An Astro page whose copy can be edited in place with Site Editor." />
+    <meta name="description" content="An Astro page whose copy can be edited in place with Inplace." />
   </head>
   <body>
     <main class="page">
@@ -42,7 +42,7 @@ applyEditableCacheHeaders(Astro.response);
       <footer>
         <p>
           This page is server-rendered. Publish updates the CDN within a few seconds. On a preview deployment the
-          words are editable straight away. On production, open <code>/?site-editor=login</code>.
+          words are editable straight away. On production, open <code>/?inplace=login</code>.
         </p>
       </footer>
     </main>
